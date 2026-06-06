@@ -10,16 +10,21 @@ const firebaseConfig = {
   measurementId: "G-M1DLWYDWHH"
 };
 
-// Initialize Firebase Realtime Database
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
-const dbRef = database.ref('boxes');
+// Initialize Firebase
+try {
+    firebase.initializeApp(firebaseConfig);
+    window.database = firebase.database();
+    window.dbRef = database.ref('boxes');
+} catch (e) {
+    console.warn("Failed to initialize Firebase SDK:", e);
+}
 
 // App State
 const state = {
     activeInputTab: 'bulk', // 'bulk' | 'scan'
     activeOutputTab: 'grouped', // 'grouped' | 'flat'
     liveMode: false,
+    firebaseActive: true, // Defaults to true, toggles to false if Firebase permissions fail
     scannedSerials: [],
     boxes: [], // { boxIndex: 1, startSerial: '...', sequence: [...], isDuplicate: false }
     flatSerials: [], // all generated items flattened
@@ -107,7 +112,60 @@ function showToast(message, type = 'info') {
     
     setTimeout(() => {
         toast.remove();
-    }, 3000);
+    }, 4500); // 4.5s for better readability of warning notices
+}
+
+// Sync Status Badge Indicator
+function updateSyncBadge() {
+    const badge = document.getElementById('syncStatus');
+    if (!badge) return;
+    if (state.firebaseActive) {
+        badge.className = 'sync-badge cloud';
+        badge.textContent = 'Cloud Live';
+        badge.title = 'Connected to Firebase Realtime Database';
+    } else {
+        badge.className = 'sync-badge local';
+        badge.textContent = 'Local Offline';
+        badge.title = 'Firebase Rules locked (permission denied) or Offline. Storing data in browser.';
+    }
+}
+
+// Fallback to LocalStorage Mode
+function switchToLocalMode(errorMsg = '') {
+    if (!state.firebaseActive) return; // Already in local mode
+    
+    state.firebaseActive = false;
+    updateSyncBadge();
+    
+    showToast("Firebase Permission Denied (locked database rules). Operating locally in LocalStorage Mode.", "warning");
+    console.warn("Firebase Database Error:", errorMsg);
+    
+    // Load existing local data
+    loadLocalData();
+}
+
+function loadLocalData() {
+    try {
+        const localData = localStorage.getItem('local_serial_boxes');
+        if (localData) {
+            state.boxes = JSON.parse(localData);
+        } else {
+            state.boxes = [];
+        }
+    } catch (e) {
+        console.error("Failed to load local storage data:", e);
+        state.boxes = [];
+    }
+    recalculateDuplicates();
+}
+
+function saveLocalData() {
+    try {
+        localStorage.setItem('local_serial_boxes', JSON.stringify(state.boxes));
+    } catch (e) {
+        console.error("Failed to save local storage data:", e);
+    }
+    recalculateDuplicates();
 }
 
 // Sound Effects System
@@ -231,44 +289,57 @@ function handleLiveScan(cleanedVal) {
     // Suppress sequence generation if starting serial is duplicate
     const newSequence = isDuplicate ? [] : generateSequence(cleanedVal, count);
     const newBoxIndex = state.boxes.length + 1;
-    
-    // Push directly to Firebase. The real-time listener will sync back and update UI
-    dbRef.push({
+    const newBox = {
         boxIndex: newBoxIndex,
         startSerial: cleanedVal,
         sequence: newSequence,
         isDuplicate: isDuplicate
-    }).then(() => {
+    };
+    
+    // Write flow: Try Firebase first, fallback to localStorage on fail
+    if (state.firebaseActive && window.dbRef) {
+        dbRef.push(newBox).then(() => {
+            if (isDuplicate) {
+                playWarningBeep();
+                showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate.`, 'error');
+            } else {
+                playSuccessBeep();
+                showToast(`Box ${newBoxIndex} added. Generated next ${count} serials.`, 'success');
+            }
+        }).catch(err => {
+            console.error("Firebase write error. Switching to Local Mode:", err);
+            switchToLocalMode(err.message);
+            // Local fallback write
+            state.boxes.push(newBox);
+            saveLocalData();
+            if (isDuplicate) {
+                playWarningBeep();
+                showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate (Local).`, 'error');
+            } else {
+                playSuccessBeep();
+                showToast(`Box ${newBoxIndex} added locally.`, 'success');
+            }
+        });
+    } else {
+        state.boxes.push(newBox);
+        saveLocalData();
         if (isDuplicate) {
             playWarningBeep();
-            // Trace original box
-            let originBoxNum = -1;
-            for (let i = 0; i < state.boxes.length; i++) {
-                const b = state.boxes[i];
-                if (b.startSerial === cleanedVal || b.sequence.some(s => s.serial === cleanedVal)) {
-                    originBoxNum = b.boxIndex;
-                    break;
-                }
-            }
-            const originMsg = originBoxNum !== -1 ? ` (exists in Box ${originBoxNum})` : '';
-            showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate${originMsg}.`, 'error');
+            showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate (Local).`, 'error');
         } else {
             playSuccessBeep();
-            showToast(`Box ${newBoxIndex} added. Generated next ${count} serials.`, 'success');
+            showToast(`Box ${newBoxIndex} added locally.`, 'success');
         }
-        
-        // Auto-scroll to newly generated card
-        setTimeout(() => {
-            const cards = dom.groupedContainer.querySelectorAll('.box-card');
-            if (cards.length > 0) {
-                const lastCard = cards[cards.length - 1];
-                lastCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        }, 80);
-    }).catch(err => {
-        showToast("Database write failed. Check internet connection.", "error");
-        console.error(err);
-    });
+    }
+    
+    // Auto-scroll to newly generated card
+    setTimeout(() => {
+        const cards = dom.groupedContainer.querySelectorAll('.box-card');
+        if (cards.length > 0) {
+            const lastCard = cards[cards.length - 1];
+            lastCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 80);
 }
 
 function removeScannedItem(index) {
@@ -295,7 +366,7 @@ function renderScannedList() {
     lucide.createIcons();
 }
 
-// Interactive Box Deletion (Synchronized on Firebase)
+// Interactive Box Deletion (Synchronized or local)
 window.deleteBox = function(boxIndex) {
     const updatedBoxes = state.boxes.filter(b => b.boxIndex !== boxIndex);
     
@@ -304,13 +375,21 @@ window.deleteBox = function(boxIndex) {
         box.boxIndex = i + 1;
     });
     
-    // Overwrite database to sync all clients
-    dbRef.set(updatedBoxes).then(() => {
-        showToast(`Box ${boxIndex} deleted.`, 'info');
-    }).catch(err => {
-        showToast("Failed to delete box. Check database connection.", "error");
-        console.error(err);
-    });
+    if (state.firebaseActive && window.dbRef) {
+        dbRef.set(updatedBoxes).then(() => {
+            showToast(`Box ${boxIndex} deleted.`, 'info');
+        }).catch(err => {
+            console.error("Firebase delete error. Switching to Local Mode:", err);
+            switchToLocalMode(err.message);
+            state.boxes = updatedBoxes;
+            saveLocalData();
+            showToast(`Box ${boxIndex} deleted locally.`, 'info');
+        });
+    } else {
+        state.boxes = updatedBoxes;
+        saveLocalData();
+        showToast(`Box ${boxIndex} deleted locally.`, 'info');
+    }
 };
 
 // Collapsible Accordion Toggle Handler
@@ -383,7 +462,7 @@ function stopCamera() {
     }
 }
 
-// Recalculate Duplicates Across State (Compiles active set and sets flags)
+// Recalculate Duplicates Across State
 function recalculateDuplicates() {
     const activeSerials = new Set();
     let dupCount = 0;
@@ -399,7 +478,6 @@ function recalculateDuplicates() {
             box.isDuplicate = false;
             activeSerials.add(start);
             
-            // Safeguard sequence structure
             if (!box.sequence) box.sequence = [];
             
             box.sequence.forEach(item => {
@@ -444,19 +522,35 @@ function recalculateDuplicates() {
     renderOutput();
 }
 
-// Clear all inputs and state (Synchronized in Firebase)
+function clearLocalState() {
+    state.scannedSerials = [];
+    state.boxes = [];
+    state.flatSerials = [];
+    state.duplicatesCount = 0;
+    dom.bulkInput.value = '';
+    dom.scanInput.value = '';
+    dom.flatOutput.value = '';
+    renderScannedList();
+}
+
+// Clear all inputs and state
 dom.btnClear.addEventListener('click', () => {
-    dbRef.set(null).then(() => {
-        state.scannedSerials = [];
-        dom.bulkInput.value = '';
-        dom.scanInput.value = '';
-        dom.flatOutput.value = '';
-        renderScannedList();
-        showToast("System cleared in database.", "info");
-    }).catch(err => {
-        showToast("Failed to clear database.", "error");
-        console.error(err);
-    });
+    if (state.firebaseActive && window.dbRef) {
+        dbRef.set(null).then(() => {
+            clearLocalState();
+            showToast("System cleared in database.", "info");
+        }).catch(err => {
+            console.error("Failed to clear database, falling back to local:", err);
+            switchToLocalMode(err.message);
+            clearLocalState();
+            saveLocalData();
+            showToast("System cleared locally.", "info");
+        });
+    } else {
+        clearLocalState();
+        saveLocalData();
+        showToast("System cleared locally.", "info");
+    }
 });
 
 // Parse Serial Sequences
@@ -512,7 +606,7 @@ function generateSequence(startSerial, count) {
     return sequence;
 }
 
-// Bulk Generation Click handler (Synchronized in Firebase)
+// Bulk Generation Click handler (Synchronized or local fallback)
 dom.btnGenerate.addEventListener('click', () => {
     const startSerials = parseStartingSerials();
     const count = parseInt(dom.seqLength.value, 10);
@@ -550,14 +644,24 @@ dom.btnGenerate.addEventListener('click', () => {
         });
     });
     
-    // Overwrite database to sync all clients
-    dbRef.set(tempBoxes).then(() => {
+    if (state.firebaseActive && window.dbRef) {
+        dbRef.set(tempBoxes).then(() => {
+            playSuccessBeep();
+            showToast("Bulk sequences generated & synced to cloud!", 'success');
+        }).catch(err => {
+            console.error("Firebase bulk write error. Switching to Local Mode:", err);
+            switchToLocalMode(err.message);
+            state.boxes = tempBoxes;
+            saveLocalData();
+            playSuccessBeep();
+            showToast("Bulk sequences generated locally (Cloud sync failed).", 'success');
+        });
+    } else {
+        state.boxes = tempBoxes;
+        saveLocalData();
         playSuccessBeep();
-        showToast("Bulk sequences generated & synced to cloud!", 'success');
-    }).catch(err => {
-        showToast("Failed to generate sequence. Check database connection.", "error");
-        console.error(err);
-    });
+        showToast("Bulk sequences generated locally.", 'success');
+    }
 });
 
 // Update Statistics Cards
@@ -689,21 +793,29 @@ dom.btnDownloadCSV.addEventListener('click', () => {
     showToast("CSV file download started.", "success");
 });
 
-// Real-Time Firebase Database Value Listener
-dbRef.on('value', (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-        // Handle object map or array structure seamlessly
-        const rawList = Array.isArray(data) ? data : Object.values(data);
-        state.boxes = rawList.filter(b => b !== null);
-        state.boxes.sort((a, b) => a.boxIndex - b.boxIndex);
-    } else {
-        state.boxes = [];
-    }
-    
-    // Automatically re-evaluate duplicates and render UI globally
-    recalculateDuplicates();
-});
+// Firebase Initialization and Listener Binding
+if (window.dbRef) {
+    dbRef.on('value', (snapshot) => {
+        state.firebaseActive = true;
+        updateSyncBadge();
+        
+        const data = snapshot.val();
+        if (data) {
+            const rawList = Array.isArray(data) ? data : Object.values(data);
+            state.boxes = rawList.filter(b => b !== null);
+            state.boxes.sort((a, b) => a.boxIndex - b.boxIndex);
+        } else {
+            state.boxes = [];
+        }
+        recalculateDuplicates();
+    }, (error) => {
+        console.warn("Firebase Listener failed (permission rules locked). Switching to local fallback:", error);
+        switchToLocalMode(error.message);
+    });
+} else {
+    // If Firebase failed to load entirely, start directly in local mode
+    switchToLocalMode("Firebase SDK not initialized correctly");
+}
 
 // Initialize UI
 initTheme();

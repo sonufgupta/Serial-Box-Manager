@@ -1079,6 +1079,32 @@ input:checked + .slider:before {
     }
 }
 
+/* Sync Status Badge */
+.sync-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 8px;
+    transition: all var(--transition-fast);
+}
+
+.sync-badge.cloud {
+    background: var(--color-emerald-light);
+    color: var(--color-emerald);
+    border-color: var(--color-emerald);
+}
+
+.sync-badge.local {
+    background: var(--color-warning-light);
+    color: var(--color-warning);
+    border-color: var(--color-warning);
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 6px;
