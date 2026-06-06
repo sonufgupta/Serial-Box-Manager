@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Serial Number Manager & Sequence Generator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- HTML5 QR/Barcode Scanner library CDN -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Firebase Compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="logo-icon">
+                    <i data-lucide="layers"></i>
+                </div>
+                <div>
+                    <h1>Serial Box Manager</h1>
+                    <p class="subtitle">Bulk starting serial scanner & sequence generator</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="toggleTheme" class="btn btn-icon" title="Toggle Theme">
+                    <i data-lucide="sun" id="themeIcon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <section class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon bg-indigo">
+                    <i data-lucide="package"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value" id="statBoxes">0</span>
+                    <span class="stat-label">Total Boxes (Starting Serials)</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon bg-emerald">
+                    <i data-lucide="hash"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value" id="statTotalSerials">0</span>
+                    <span class="stat-label">Total Generated Serials</span>
+                </div>
+            </div>
+            <div class="stat-card" id="statCardDuplicates">
+                <div class="stat-icon bg-rose">
+                    <i data-lucide="copy-check"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value text-rose" id="statDuplicates">0</span>
+                    <span class="stat-label">Duplicate Serials Found</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Grid -->
+        <main class="main-grid">
+            <!-- Left Side: Inputs & Configuration -->
+            <section class="panel input-panel">
+                <div class="panel-header">
+                    <i data-lucide="sliders-horizontal" class="text-indigo"></i>
+                    <h2>Input & Settings</h2>
+                </div>
+
+                <div class="control-group">
+                    <label for="seqLength">
+                        <span>Sequence Length per Box</span>
+                        <span class="label-hint">Total serials to generate starting from each scanned serial</span>
+                    </label>
+                    <div class="number-input-wrapper">
+                        <input type="number" id="seqLength" min="1" max="1000" value="10">
+                        <span class="input-suffix">serials/box</span>
+                    </div>
+                </div>
+
+                <div class="control-group toggle-group">
+                    <label class="toggle-label" for="liveModeToggle">
+                        <div class="toggle-title">
+                            <span>Live Scanner Mode</span>
+                            <span class="label-hint">Generate sequence & check duplicates instantly on scan</span>
+                        </div>
+                        <div class="switch">
+                            <input type="checkbox" id="liveModeToggle">
+                            <span class="slider round"></span>
+                        </div>
+                    </label>
+                </div>
+
+
+                <div class="input-tabs">
+                    <button class="tab-btn active" data-tab="bulk">
+                        <i data-lucide="text-quote"></i> Bulk Chat Box
+                    </button>
+                    <button class="tab-btn" data-tab="scan">
+                        <i data-lucide="scan-barcode"></i> Scanner Input
+                    </button>
+                </div>
+
+                <div class="tab-content active" id="tabBulk">
+                    <div class="textarea-wrapper">
+                        <textarea id="bulkInput" placeholder="Paste starting serial numbers here, separated by commas or newlines...&#10;Example:&#10;68001, XX00560010, SN-800"></textarea>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tabScan">
+                    <div class="scan-wrapper">
+                        <div class="scanner-input-container">
+                            <input type="text" id="scanInput" placeholder="Click here and scan barcode/type serial number...">
+                            <i data-lucide="barcode" class="input-icon"></i>
+                            <button id="btnStartCamera" class="btn btn-icon input-action-btn" title="Scan with Phone Camera">
+                                <i data-lucide="camera"></i>
+                            </button>
+                        </div>
+                        <p class="scan-help"><i data-lucide="info" class="help-icon"></i> Barcode scanners automatically submit when they scan. Press Enter manually if typing.</p>
+                        
+                        <div class="scanned-list-wrapper">
+                            <h3>Scanned Starting Serials (<span id="scanCount">0</span>)</h3>
+                            <div class="scanned-list" id="scannedList">
+                                <div class="empty-list-text">No starting serials scanned yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions-wrapper">
+                    <button id="btnGenerate" class="btn btn-primary btn-lg">
+                        <i data-lucide="play"></i> Generate Sequences for All Boxes
+                    </button>
+                    <button id="btnClear" class="btn btn-secondary btn-lg">
+                        <i data-lucide="trash-2"></i> Clear All
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Side: Outputs -->
+            <section class="panel output-panel">
+                <div class="panel-header header-tabs">
+                    <div class="title-with-icon">
+                        <i data-lucide="layout-dashboard" class="text-indigo"></i>
+                        <h2>Generated Outputs</h2>
+                    </div>
+                    <div class="output-tabs">
+                        <button class="out-tab-btn active" data-out-tab="grouped">
+                            <i data-lucide="box"></i> Box-Wise View
+                        </button>
+                        <button class="out-tab-btn" data-out-tab="flat">
+                            <i data-lucide="list"></i> Master Flat List
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Box-Wise View Tab -->
+                <div class="out-tab-content active" id="outTabGrouped">
+                    <div class="grouped-container" id="groupedContainer">
+                        <div class="empty-output-state">
+                            <i data-lucide="layers-2"></i>
+                            <p>No sequences generated yet. Input starting serials and click "Generate".</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Flat List Tab -->
+                <div class="out-tab-content" id="outTabFlat">
+                    <div class="flat-list-wrapper">
+                        <div class="flat-header">
+                            <p class="flat-subtitle">A clean list of all serial numbers (starting + generated) ready to copy or export.</p>
+                            <div class="flat-actions">
+                                <button id="btnCopyFlat" class="btn btn-secondary btn-sm">
+                                    <i data-lucide="copy"></i> Copy to Clipboard
+                                </button>
+                                <button id="btnDownloadCSV" class="btn btn-secondary btn-sm">
+                                    <i data-lucide="download"></i> Download CSV
+                                </button>
+                            </div>
+                        </div>
+                        <div class="textarea-wrapper">
+                            <textarea id="flatOutput" readonly placeholder="Generated serial numbers will appear here..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Camera Scanner Overlay -->
+    <div id="cameraModal" class="camera-modal">
+        <div class="camera-modal-content">
+            <div class="camera-modal-header">
+                <h3>Camera Barcode Scanner</h3>
+                <button id="btnCloseCamera" class="btn btn-icon btn-close-modal" title="Close Camera">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="camera-viewport-wrapper">
+                <div id="cameraReader"></div>
+            </div>
+            <div class="camera-modal-footer">
+                <p>Align the barcode within the camera viewport to scan automatically.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
