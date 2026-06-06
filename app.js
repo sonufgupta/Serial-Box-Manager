@@ -19,12 +19,17 @@ try {
     console.warn("Failed to initialize Firebase SDK:", e);
 }
 
+// Session Identity for Presence Tracking
+const sessionId = Math.random().toString(36).substring(2, 9);
+const deviceType = window.innerWidth <= 768 ? "Mobile Phone" : "Desktop PC";
+let sessionRef = null;
+
 // App State
 const state = {
     activeInputTab: 'bulk', // 'bulk' | 'scan'
     activeOutputTab: 'grouped', // 'grouped' | 'flat'
     liveMode: false,
-    firebaseActive: true, // Defaults to true, toggles to false if Firebase permissions fail
+    firebaseActive: true, // Defaults to true, toggles to false if Firebase permissions or connection fails
     scannedSerials: [],
     boxes: [], // { boxIndex: 1, startSerial: '...', sequence: [...], isDuplicate: false }
     flatSerials: [], // all generated items flattened
@@ -72,6 +77,17 @@ const dom = {
     toastContainer: document.getElementById('toastContainer')
 };
 
+// Safe Icon Rendering (handles slow or blocked Lucide script loading)
+function renderIcons() {
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+        try {
+            lucide.createIcons();
+        } catch (e) {
+            console.warn("Lucide icons failed to render:", e);
+        }
+    }
+}
+
 // Theme Management
 function initTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -82,7 +98,7 @@ function initTheme() {
         document.body.classList.remove('light-theme');
         dom.themeIcon.setAttribute('data-lucide', 'sun');
     }
-    lucide.createIcons();
+    renderIcons();
 }
 
 dom.toggleTheme.addEventListener('click', () => {
@@ -90,7 +106,7 @@ dom.toggleTheme.addEventListener('click', () => {
     const isLight = document.body.classList.contains('light-theme');
     localStorage.setItem('theme', isLight ? 'light' : 'theme');
     dom.themeIcon.setAttribute('data-lucide', isLight ? 'moon' : 'sun');
-    lucide.createIcons();
+    renderIcons();
 });
 
 // Toast System
@@ -108,11 +124,11 @@ function showToast(message, type = 'info') {
         <span>${message}</span>
     `;
     dom.toastContainer.appendChild(toast);
-    lucide.createIcons();
+    renderIcons();
     
     setTimeout(() => {
         toast.remove();
-    }, 4500); // 4.5s for better readability of warning notices
+    }, 4500); 
 }
 
 // Sync Status Badge Indicator
@@ -126,7 +142,7 @@ function updateSyncBadge() {
     } else {
         badge.className = 'sync-badge local';
         badge.textContent = 'Local Offline';
-        badge.title = 'Firebase Rules locked (permission denied) or Offline. Storing data in browser.';
+        badge.title = 'Firebase Rules locked or Offline. Storing data in browser.';
     }
 }
 
@@ -137,10 +153,20 @@ function switchToLocalMode(errorMsg = '') {
     state.firebaseActive = false;
     updateSyncBadge();
     
-    showToast("Firebase Permission Denied (locked database rules). Operating locally in LocalStorage Mode.", "warning");
-    console.warn("Firebase Database Error:", errorMsg);
+    // Detach Firebase listeners to prevent background overwrites
+    try {
+        if (window.dbRef && typeof dbRef.off === 'function') {
+            dbRef.off();
+        }
+        sessionRef = null;
+    } catch (e) {
+        console.warn("Failed to detach Firebase listeners:", e);
+    }
     
-    // Load existing local data
+    showToast("Firebase Offline/Permission Denied. Operating in LocalStorage Mode.", "warning");
+    console.warn("Firebase Database Fallback triggered:", errorMsg);
+    
+    // Load local storage data
     loadLocalData();
 }
 
@@ -166,6 +192,80 @@ function saveLocalData() {
         console.error("Failed to save local storage data:", e);
     }
     recalculateDuplicates();
+}
+
+// Save scanned starting serials to localStorage
+function saveScannedSerials() {
+    try {
+        localStorage.setItem('local_scanned_serials', JSON.stringify(state.scannedSerials));
+    } catch (e) {
+        console.error("Failed to save scanned serials:", e);
+    }
+}
+
+// Save active configurations/tabs
+function saveSettings() {
+    try {
+        localStorage.setItem('local_seq_length', dom.seqLength.value);
+        localStorage.setItem('local_live_mode', state.liveMode);
+        localStorage.setItem('local_active_input_tab', state.activeInputTab);
+        localStorage.setItem('local_active_output_tab', state.activeOutputTab);
+    } catch (e) {
+        console.error("Failed to save configurations:", e);
+    }
+}
+
+// Restore state on page reload
+function restoreState() {
+    try {
+        // 1. Scanned starting serials
+        const savedScans = localStorage.getItem('local_scanned_serials');
+        state.scannedSerials = savedScans ? JSON.parse(savedScans) : [];
+        renderScannedList();
+        
+        // 2. Sequence Length
+        const savedSeqLen = localStorage.getItem('local_seq_length');
+        if (savedSeqLen) {
+            dom.seqLength.value = savedSeqLen;
+        }
+        
+        // 3. Live Scanner Mode
+        const savedLiveMode = localStorage.getItem('local_live_mode');
+        if (savedLiveMode === 'true') {
+            state.liveMode = true;
+            dom.liveModeToggle.checked = true;
+        } else {
+            state.liveMode = false;
+            dom.liveModeToggle.checked = false;
+        }
+        
+        // 4. Tabs Status
+        const savedInputTab = localStorage.getItem('local_active_input_tab');
+        if (savedInputTab) {
+            state.activeInputTab = savedInputTab;
+            const btn = document.querySelector(`[data-tab="${savedInputTab}"]`);
+            if (btn) {
+                dom.tabButtons.forEach(b => b.classList.remove('active'));
+                dom.tabContents.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`tab${savedInputTab.charAt(0).toUpperCase() + savedInputTab.slice(1)}`).classList.add('active');
+            }
+        }
+        
+        const savedOutputTab = localStorage.getItem('local_active_output_tab');
+        if (savedOutputTab) {
+            state.activeOutputTab = savedOutputTab;
+            const btn = document.querySelector(`[data-out-tab="${savedOutputTab}"]`);
+            if (btn) {
+                dom.outTabButtons.forEach(b => b.classList.remove('active'));
+                dom.outTabContents.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`outTab${savedOutputTab.charAt(0).toUpperCase() + savedOutputTab.slice(1)}`).classList.add('active');
+            }
+        }
+    } catch (e) {
+        console.error("Failed to restore states:", e);
+    }
 }
 
 // Sound Effects System
@@ -207,6 +307,7 @@ dom.tabButtons.forEach(button => {
         state.activeInputTab = button.dataset.tab;
         document.getElementById(`tab${state.activeInputTab.charAt(0).toUpperCase() + state.activeInputTab.slice(1)}`).classList.add('active');
         
+        saveSettings();
         if (state.activeInputTab === 'scan') {
             dom.scanInput.focus();
         }
@@ -221,18 +322,29 @@ dom.outTabButtons.forEach(button => {
         button.classList.add('active');
         state.activeOutputTab = button.dataset.outTab;
         document.getElementById(`outTab${state.activeOutputTab.charAt(0).toUpperCase() + state.activeOutputTab.slice(1)}`).classList.add('active');
+        
+        saveSettings();
     });
 });
 
 // Settings Events
 dom.liveModeToggle.addEventListener('change', () => {
     state.liveMode = dom.liveModeToggle.checked;
+    saveSettings();
     if (state.liveMode) {
         showToast("Live Scanner Mode Enabled (Auto-generate active)", "success");
         const scanTabBtn = document.querySelector('[data-tab="scan"]');
         if (scanTabBtn) scanTabBtn.click();
     } else {
         showToast("Live Scanner Mode Disabled", "info");
+    }
+});
+
+dom.seqLength.addEventListener('change', () => {
+    saveSettings();
+    if (!state.firebaseActive) {
+        recalculateDuplicates();
+        saveLocalData();
     }
 });
 
@@ -268,6 +380,7 @@ function handleNormalScan(cleanedVal) {
         showToast(`"${cleanedVal}" is already in the scan list.`, 'warning');
     } else {
         state.scannedSerials.push(cleanedVal);
+        saveScannedSerials();
         playSuccessBeep();
         showToast(`Added starting serial: ${cleanedVal}`, 'success');
         renderScannedList();
@@ -344,6 +457,7 @@ function handleLiveScan(cleanedVal) {
 
 function removeScannedItem(index) {
     state.scannedSerials.splice(index, 1);
+    saveScannedSerials();
     renderScannedList();
     dom.scanInput.focus();
 }
@@ -363,7 +477,7 @@ function renderScannedList() {
             </button>
         </div>
     `).join('');
-    lucide.createIcons();
+    renderIcons();
 }
 
 // Interactive Box Deletion (Synchronized or local)
@@ -411,6 +525,12 @@ dom.btnCloseCamera.addEventListener('click', () => {
 });
 
 function startCamera() {
+    if (typeof Html5Qrcode === 'undefined') {
+        showToast("Camera library not loaded. Check internet connection.", "error");
+        dom.cameraModal.classList.remove('active');
+        return;
+    }
+    
     if (html5QrCode) {
         stopCamera();
     }
@@ -530,6 +650,11 @@ function clearLocalState() {
     dom.bulkInput.value = '';
     dom.scanInput.value = '';
     dom.flatOutput.value = '';
+    
+    // Clear localStorage entries
+    localStorage.removeItem('local_scanned_serials');
+    localStorage.removeItem('local_serial_boxes');
+    
     renderScannedList();
 }
 
@@ -543,12 +668,10 @@ dom.btnClear.addEventListener('click', () => {
             console.error("Failed to clear database, falling back to local:", err);
             switchToLocalMode(err.message);
             clearLocalState();
-            saveLocalData();
             showToast("System cleared locally.", "info");
         });
     } else {
         clearLocalState();
-        saveLocalData();
         showToast("System cleared locally.", "info");
     }
 });
@@ -687,7 +810,7 @@ function renderOutput() {
             </div>
         `;
         dom.flatOutput.value = '';
-        lucide.createIcons();
+        renderIcons();
         return;
     }
     
@@ -750,7 +873,7 @@ function renderOutput() {
     
     dom.flatOutput.value = state.flatSerials.map(s => s.serial).join('\n');
     
-    lucide.createIcons();
+    renderIcons();
 }
 
 // Clipboard Action
@@ -793,11 +916,27 @@ dom.btnDownloadCSV.addEventListener('click', () => {
     showToast("CSV file download started.", "success");
 });
 
+// Firebase Connection Timeout (Switches to Local mode if connection hangs > 3.5 seconds)
+let firebaseTimeout = setTimeout(() => {
+    if (state.firebaseActive && state.boxes.length === 0) {
+        console.warn("Firebase Connection timed out. Falling back to LocalMode.");
+        switchToLocalMode("Connection Timeout");
+    }
+}, 3500);
+
 // Firebase Initialization and Listener Binding
 if (window.dbRef) {
     dbRef.on('value', (snapshot) => {
+        clearTimeout(firebaseTimeout);
         state.firebaseActive = true;
         updateSyncBadge();
+        
+        // Write dynamic active session to database
+        if (!sessionRef && window.database) {
+            sessionRef = database.ref('active_sessions/session_' + sessionId);
+            sessionRef.set(deviceType + " (Online) - Last Active: " + new Date().toLocaleTimeString());
+            sessionRef.onDisconnect().remove();
+        }
         
         const data = snapshot.val();
         if (data) {
@@ -809,15 +948,17 @@ if (window.dbRef) {
         }
         recalculateDuplicates();
     }, (error) => {
+        clearTimeout(firebaseTimeout);
         console.warn("Firebase Listener failed (permission rules locked). Switching to local fallback:", error);
         switchToLocalMode(error.message);
     });
 } else {
-    // If Firebase failed to load entirely, start directly in local mode
+    clearTimeout(firebaseTimeout);
     switchToLocalMode("Firebase SDK not initialized correctly");
 }
 
-// Initialize UI
+// Initialize UI & Restore State
 initTheme();
-renderScannedList();
+restoreState();
 updateStats();
+updateSyncBadge();
