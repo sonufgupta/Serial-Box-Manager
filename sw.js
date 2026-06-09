@@ -80,8 +80,8 @@ self.addEventListener('push', (event) => {
   let title = 'Serial Box Manager';
   let options = {
     body: 'Notification from Serial Box Manager',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png'
+    icon: 'icons/icon-192x192.png',
+    badge: 'icons/icon-192x192.png'
   };
 
   if (event.data) {
