@@ -2,7 +2,9 @@
   "name": "Serial Box Manager",
   "short_name": "Serial Manager",
   "description": "A premium live serial box manager and sequence generator with real-time barcode scanning and duplicate detection synced to Firebase.",
+  "id": "serial-box-manager",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b0f19",
   "theme_color": "#6366f1",
@@ -10,6 +12,97 @@
   "categories": [
     "productivity",
     "utilities"
+  ],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": "12345678",
+  "display_override": [
+    "window-controls-overlay",
+    "tabbed",
+    "minimal-ui"
+  ],
+  "tab_strip": {
+    "home_tab": {
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "scope": "./"
+    },
+    "new_tab_button": {
+      "url": "./index.html"
+    }
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "./index.html",
+      "accept": {
+        "text/plain": [
+          ".txt"
+        ],
+        "text/csv": [
+          ".csv"
+        ]
+      },
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "launch_type": "single-client"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+serial",
+      "url": "./index.html?serial=%s"
+    }
+  ],
+  "scope_extensions": [
+    {
+      "origin": "serial-box-1d9f3.firebaseapp.com"
+    },
+    {
+      "origin": "serial-box-1d9f3-default-rtdb.asia-southeast1.firebasedatabase.app"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Serial Box Quick Stat",
+      "description": "Shows the current count of starting serial boxes and total serial numbers.",
+      "tag": "serial-stat-widget",
+      "ms_ac_template": "{\"$schema\":\"http://adaptivecards.io/schemas/adaptive-card.json\",\"type\":\"AdaptiveCard\",\"version\":\"1.5\",\"body\":[{\"type\":\"TextBlock\",\"text\":\"Serial Box Manager\",\"weight\":\"Bolder\",\"size\":\"Medium\"},{\"type\":\"FactSet\",\"facts\":[{\"title\":\"Total Boxes:\",\"value\":\"${statBoxes}\"},{\"title\":\"Total Serials:\",\"value\":\"${statTotalSerials}\"}]}]}",
+      "data": "./index.html?widget-data=true",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ],
   "icons": [
     {
@@ -47,6 +140,25 @@
       "name": "Scanner Mode",
       "url": "./index.html?tab=scan",
       "description": "Open Live Scanner Input"
+    }
+  ],
+  "note_taking": {
+    "new_note_url": "./index.html?new-note=true"
+  },
+  "screenshots": [
+    {
+      "src": "screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop Serial Box Manager"
+    },
+    {
+      "src": "screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile Live Barcode Scanner"
     }
   ]
 }

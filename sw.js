@@ -1,68 +1,54 @@
-const CACHE_NAME = 'serial-manager-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap',
-  'https://unpkg.com/lucide@latest',
-  'https://unpkg.com/html5-qrcode',
-  'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'
-];
+// This is the service worker with the combined offline experience (Offline page + Offline copy of pages)
 
-// Install Event
-self.addEventListener('install', (event) => {
+const CACHE = "pwabuilder-offline-page";
+
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.1.2/workbox-sw.js');
+
+// Pointing to our custom offline fallback page
+const offlineFallbackPage = "offline.html";
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('install', async (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching PWA assets...');
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((cache) => cache.add(offlineFallbackPage))
   );
 });
 
-// Activate Event (Cleanup old caches)
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Clearing old cache:', cache);
-            return caches.delete(cache);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
+if (workbox.navigationPreload.isSupported()) {
+  workbox.navigationPreload.enable();
+}
 
-// Fetch Event (Stale-While-Revalidate Strategy)
+workbox.routing.registerRoute(
+  new RegExp('/*'),
+  new workbox.strategies.StaleWhileRevalidate({
+    cacheName: CACHE
+  })
+);
+
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and local/safe HTTP/HTTPS URLs
-  if (event.request.method !== 'GET') return;
-  
-  const url = new URL(event.request.url);
-  if (!url.protocol.startsWith('http') && !url.protocol.startsWith('https')) return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const preloadResp = await event.preloadResponse;
 
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((cachedResponse) => {
-        const fetchedResponse = fetch(event.request).then((networkResponse) => {
-          // Cache the response if it's valid
-          if (networkResponse && networkResponse.status === 200) {
-            cache.put(event.request, networkResponse.clone());
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Network failure - fallback silently to cache
-          return cachedResponse;
-        });
+        if (preloadResp) {
+          return preloadResp;
+        }
 
-        // Return cached version immediately if available, otherwise fetch from network
-        return cachedResponse || fetchedResponse;
-      });
-    })
-  );
+        const networkResp = await fetch(event.request);
+        return networkResp;
+      } catch (error) {
+
+        const cache = await caches.open(CACHE);
+        const cachedResp = await cache.match(offlineFallbackPage);
+        return cachedResp;
+      }
+    })());
+  }
 });

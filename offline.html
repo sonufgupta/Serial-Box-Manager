@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Serial Box Manager</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #131a26;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-indigo: #6366f1;
+            --accent-indigo-hover: #4f46e5;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            margin: 0;
+        }
+
+        .offline-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 40px 32px;
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .icon-container {
+            width: 72px;
+            height: 72px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-indigo);
+            border-radius: var(--radius-md);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .icon-container i, .icon-container svg {
+            width: 36px;
+            height: 36px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.025em;
+        }
+
+        p {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin: 0 0 32px 0;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-indigo), var(--accent-indigo-hover));
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            border: none;
+            padding: 14px 28px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-card">
+        <div class="icon-container">
+            <i data-lucide="wifi-off"></i>
+        </div>
+        <h1>You are Offline</h1>
+        <p>We couldn't connect to the network. Please check your internet connection and try again to sync with Firebase.</p>
+        <button class="btn" onclick="window.location.reload()">
+            <i data-lucide="rotate-cw" style="width: 16px; height: 16px;"></i> Retry Connection
+        </button>
+    </div>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

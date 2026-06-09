@@ -960,8 +960,93 @@ if (window.dbRef) {
 // Initialize UI & Restore State
 initTheme();
 restoreState();
+handleQueryParams();
+registerFileLaunchHandler();
 updateStats();
 updateSyncBadge();
+
+// Parse query parameters from PWA shortcuts / share targets / protocols
+function handleQueryParams() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 1. Handle tab switching
+        const tab = urlParams.get('tab');
+        if (tab === 'scan' || tab === 'bulk') {
+            state.activeInputTab = tab;
+            const btn = document.querySelector(`[data-tab="${tab}"]`);
+            if (btn) {
+                dom.tabButtons.forEach(b => b.classList.remove('active'));
+                dom.tabContents.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+                saveSettings();
+                if (tab === 'scan') {
+                    dom.scanInput.focus();
+                }
+            }
+        }
+        
+        // 2. Handle Share Target & Protocol Handler & Note-taking
+        const sharedText = urlParams.get('text') || urlParams.get('url');
+        const sharedTitle = urlParams.get('title');
+        const customSerial = urlParams.get('serial');
+        const isNewNote = urlParams.get('new-note');
+        
+        let importedContent = '';
+        
+        if (sharedText) {
+            importedContent = sharedText;
+            showToast(`Shared content imported: ${sharedTitle || 'Text'}`, 'success');
+        } else if (customSerial) {
+            let serialVal = decodeURIComponent(customSerial);
+            if (serialVal.startsWith('web+serial://')) {
+                serialVal = serialVal.substring('web+serial://'.length);
+            }
+            importedContent = serialVal;
+            showToast(`Serial link loaded: ${serialVal}`, 'success');
+        } else if (isNewNote === 'true') {
+            showToast("New note-taking workspace initiated.", "info");
+        }
+        
+        if (importedContent) {
+            if (dom.bulkInput.value) {
+                dom.bulkInput.value += '\n' + importedContent;
+            } else {
+                dom.bulkInput.value = importedContent;
+            }
+            const bulkTabBtn = document.querySelector('[data-tab="bulk"]');
+            if (bulkTabBtn) bulkTabBtn.click();
+        }
+    } catch (e) {
+        console.error("Failed to parse query parameters:", e);
+    }
+}
+
+// Register launchQueue file handler for associated files (.txt, .csv)
+function registerFileLaunchHandler() {
+    if ('launchQueue' in window && 'files' in LaunchParams.prototype) {
+        window.launchQueue.setConsumer(async (launchParams) => {
+            if (launchParams.files && launchParams.files.length > 0) {
+                for (const fileHandle of launchParams.files) {
+                    try {
+                        const file = await fileHandle.getFile();
+                        const text = await file.text();
+                        if (text) {
+                            dom.bulkInput.value = text;
+                            const bulkTabBtn = document.querySelector('[data-tab="bulk"]');
+                            if (bulkTabBtn) bulkTabBtn.click();
+                            showToast(`Imported serials from: ${file.name}`, 'success');
+                        }
+                    } catch (err) {
+                        console.error("Failed to read file from launchParams:", err);
+                        showToast("Failed to open file.", "error");
+                    }
+                }
+            }
+        });
+    }
+}
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
