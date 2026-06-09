@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Icon Generator</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0b0f19;
+            color: #f3f4f6;
+            text-align: center;
+            padding: 40px;
+        }
+        .card {
+            background: #131a26;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 40px auto 0;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #6366f1;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #9ca3af;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .btn:hover {
+            transform: scale(1.02);
+        }
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>PWA PNG Icon Generator</h1>
+        <p>This helper tool will automatically generate and download the required PWA PNG icons from the source SVG vectors. Please click the button below and save the downloaded files into your <strong>icons/</strong> folder.</p>
+        <button class="btn" id="btnGen">Generate & Download Icons</button>
+    </div>
+
+    <!-- Hidden Canvases for Rendering -->
+    <canvas id="canvas192" width="192" height="192"></canvas>
+    <canvas id="canvas512" width="512" height="512"></canvas>
+    <canvas id="canvasMaskable192" width="192" height="192"></canvas>
+    <canvas id="canvasMaskable512" width="512" height="512"></canvas>
+
+    <script>
+        const btn = document.getElementById('btnGen');
+        btn.addEventListener('click', async () => {
+            await downloadIcon('icons/icon.svg', 'canvas192', 192, 'icon-192.png');
+            await downloadIcon('icons/icon.svg', 'canvas512', 512, 'icon-512.png');
+            await downloadIcon('icons/icon-maskable.svg', 'canvasMaskable192', 192, 'icon-192-maskable.png');
+            await downloadIcon('icons/icon-maskable.svg', 'canvasMaskable512', 512, 'icon-512-maskable.png');
+            alert("All 4 PNG icons generated! Please move the downloaded files into the 'icons/' folder.");
+        });
+
+        function downloadIcon(svgSrc, canvasId, size, filename) {
+            return new Promise((resolve) => {
+                const canvas = document.getElementById(canvasId);
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, size, size);
+                    ctx.drawImage(img, 0, 0, size, size);
+                    
+                    // Trigger Download
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = canvas.toDataURL('image/png');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    resolve();
+                };
+                img.src = svgSrc;
+            });
+        }
+    </script>
+</body>
+</html>

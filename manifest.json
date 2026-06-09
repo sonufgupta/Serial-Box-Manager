@@ -1,0 +1,52 @@
+{
+  "name": "Serial Box Manager",
+  "short_name": "Serial Manager",
+  "description": "A premium live serial box manager and sequence generator with real-time barcode scanning and duplicate detection synced to Firebase.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#6366f1",
+  "orientation": "any",
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Bulk Chat Box",
+      "url": "./index.html?tab=bulk",
+      "description": "Open Bulk Chat Box Input"
+    },
+    {
+      "name": "Scanner Mode",
+      "url": "./index.html?tab=scan",
+      "description": "Open Live Scanner Input"
+    }
+  ]
+}
