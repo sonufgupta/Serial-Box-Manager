@@ -54,7 +54,7 @@
 <body>
     <div class="card">
         <h1>PWA PNG Icon Generator</h1>
-        <p>This helper tool will automatically generate and download the required PWA PNG icons from the source SVG vectors. Please click the button below and save the downloaded files into your <strong>icons/</strong> folder.</p>
+        <p>This helper tool will automatically generate and download the required PWA PNG icons from the source SVG vectors. This utility is now pre-compiled to bypass CORS security policies, meaning it works when opened directly from your local file system.</p>
         <button class="btn" id="btnGen">Generate & Download Icons</button>
     </div>
 
@@ -65,16 +65,90 @@
     <canvas id="canvasMaskable512" width="512" height="512"></canvas>
 
     <script>
+        // Inline SVG codes to bypass CORS tainted canvas exceptions in local file:// mode
+        const svgIconRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#0b0f19" rx="128" />
+  
+  <!-- Outer glowing box representing the package -->
+  <rect x="128" y="128" width="256" height="256" rx="48" fill="none" stroke="url(#indigoGrad)" stroke-width="16" />
+  
+  <!-- Barcode lines inside -->
+  <g transform="translate(160, 192)">
+    <line x1="0" y1="0" x2="0" y2="96" stroke="#f3f4f6" stroke-width="12" stroke-linecap="round" />
+    <line x1="24" y1="0" x2="24" y2="96" stroke="#f3f4f6" stroke-width="6" stroke-linecap="round" />
+    <line x1="48" y1="0" x2="48" y2="96" stroke="#f3f4f6" stroke-width="20" stroke-linecap="round" />
+    <line x1="88" y1="0" x2="88" y2="96" stroke="#f3f4f6" stroke-width="6" stroke-linecap="round" />
+    <line x1="108" y1="0" x2="108" y2="96" stroke="#f3f4f6" stroke-width="12" stroke-linecap="round" />
+    <line x1="132" y1="0" x2="132" y2="96" stroke="#f3f4f6" stroke-width="20" stroke-linecap="round" />
+    <line x1="168" y1="0" x2="168" y2="96" stroke="#f3f4f6" stroke-width="12" stroke-linecap="round" />
+    <line x1="192" y1="0" x2="192" y2="96" stroke="#f3f4f6" stroke-width="6" stroke-linecap="round" />
+  </g>
+  
+  <!-- Scanning laser line -->
+  <line x1="80" y1="256" x2="432" y2="256" stroke="#10b981" stroke-width="12" stroke-linecap="round" filter="url(#glow)" />
+  
+  <!-- Definitions for Gradients and Glow -->
+  <defs>
+    <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+</svg>`;
+
+        const svgMaskableRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Background (no corner radius to fill the maskable canvas entirely) -->
+  <rect width="100%" height="100%" fill="#0b0f19" />
+  
+  <!-- Outer glowing box representing the package -->
+  <rect x="128" y="128" width="256" height="256" rx="48" fill="none" stroke="url(#indigoGrad)" stroke-width="16" />
+  
+  <!-- Barcode lines inside -->
+  <g transform="translate(160, 192)">
+    <line x1="0" y1="0" x2="0" y2="96" stroke="#f3f4f6" stroke-width="12" stroke-linecap="round" />
+    <line x1="24" y1="0" x2="24" y2="96" stroke="#f3f4f6" stroke-width="6" stroke-linecap="round" />
+    <line x1="48" y1="0" x2="48" y2="96" stroke="#f3f4f6" stroke-width="20" stroke-linecap="round" />
+    <line x1="88" y1="0" x2="88" y2="96" stroke="#f3f4f6" stroke-width="6" stroke-linecap="round" />
+    <line x1="108" y1="0" x2="108" y2="96" stroke="#f3f4f6" stroke-width="12" stroke-linecap="round" />
+    <line x1="132" y1="0" x2="132" y2="96" stroke="#f3f4f6" stroke-width="20" stroke-linecap="round" />
+    <line x1="168" y1="0" x2="168" y2="96" stroke="#f3f4f6" stroke-width="12" stroke-linecap="round" />
+    <line x1="192" y1="0" x2="192" y2="96" stroke="#f3f4f6" stroke-width="6" stroke-linecap="round" />
+  </g>
+  
+  <!-- Scanning laser line -->
+  <line x1="80" y1="256" x2="432" y2="256" stroke="#10b981" stroke-width="12" stroke-linecap="round" filter="url(#glow)" />
+  
+  <!-- Definitions for Gradients and Glow -->
+  <defs>
+    <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+</svg>`;
+
+        const svgIconUrl = 'data:image/svg+xml;base64,' + btoa(svgIconRaw);
+        const svgMaskableUrl = 'data:image/svg+xml;base64,' + btoa(svgMaskableRaw);
+
         const btn = document.getElementById('btnGen');
         btn.addEventListener('click', async () => {
-            await downloadIcon('icons/icon.svg', 'canvas192', 192, 'icon-192.png');
-            await downloadIcon('icons/icon.svg', 'canvas512', 512, 'icon-512.png');
-            await downloadIcon('icons/icon-maskable.svg', 'canvasMaskable192', 192, 'icon-192-maskable.png');
-            await downloadIcon('icons/icon-maskable.svg', 'canvasMaskable512', 512, 'icon-512-maskable.png');
+            await downloadIcon(svgIconUrl, 'canvas192', 192, 'icon-192x192.png');
+            await downloadIcon(svgIconUrl, 'canvas512', 512, 'icon-512x512.png');
+            await downloadIcon(svgMaskableUrl, 'canvasMaskable192', 192, 'icon-192x192-maskable.png');
+            await downloadIcon(svgMaskableUrl, 'canvasMaskable512', 512, 'icon-512x512-maskable.png');
             alert("All 4 PNG icons generated! Please move the downloaded files into the 'icons/' folder.");
         });
 
-        function downloadIcon(svgSrc, canvasId, size, filename) {
+        function downloadIcon(dataUrl, canvasId, size, filename) {
             return new Promise((resolve) => {
                 const canvas = document.getElementById(canvasId);
                 const ctx = canvas.getContext('2d');
@@ -93,7 +167,7 @@
                     
                     resolve();
                 };
-                img.src = svgSrc;
+                img.src = dataUrl;
             });
         }
     </script>
