@@ -16,8 +16,14 @@
   "lang": "en-US",
   "dir": "ltr",
   "prefer_related_applications": false,
-  "related_applications": [],
-  "iarc_rating_id": "12345678",
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.serialboxmanager",
+      "id": "com.serialboxmanager"
+    }
+  ],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "display_override": [
     "window-controls-overlay",
     "tabbed",
@@ -82,10 +88,12 @@
   ],
   "scope_extensions": [
     {
-      "origin": "serial-box-1d9f3.firebaseapp.com"
+      "type": "origin",
+      "origin": "https://serial-box-1d9f3.firebaseapp.com"
     },
     {
-      "origin": "serial-box-1d9f3-default-rtdb.asia-southeast1.firebasedatabase.app"
+      "type": "origin",
+      "origin": "https://serial-box-1d9f3-default-rtdb.asia-southeast1.firebasedatabase.app"
     }
   ],
   "widgets": [
