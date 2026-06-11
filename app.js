@@ -732,36 +732,51 @@ dom.btnClear.addEventListener('click', () => {
 
 // --- LENGTH MISMATCH VALIDATION SYSTEM ---
 
-// Expected length detection (first item is the reference)
-function getExpectedSerialLength() {
+// Get all allowed serial lengths based on currently active scans and boxes
+function getAllowedSerialLengths() {
+    const lengths = new Set();
+    const examples = {};
+    
     if (state.boxes && state.boxes.length > 0) {
-        return {
-            length: state.boxes[0].startSerial.length,
-            example: state.boxes[0].startSerial
-        };
+        state.boxes.forEach(box => {
+            if (box.startSerial) {
+                lengths.add(box.startSerial.length);
+                examples[box.startSerial.length] = box.startSerial;
+            }
+        });
     }
+    
     if (state.scannedSerials && state.scannedSerials.length > 0) {
-        return {
-            length: state.scannedSerials[0].length,
-            example: state.scannedSerials[0]
-        };
+        state.scannedSerials.forEach(serial => {
+            lengths.add(serial.length);
+            examples[serial.length] = serial;
+        });
     }
-    return null;
+    
+    return {
+        lengths: Array.from(lengths),
+        examples: examples
+    };
 }
 
 // Validate scanned serial length and show warning modal if mismatched
 function validateAndProcessScan(cleanedVal) {
-    const expected = getExpectedSerialLength();
-    if (expected !== null && cleanedVal.length !== expected.length) {
+    const allowed = getAllowedSerialLengths();
+    
+    if (allowed.lengths.length > 0 && !allowed.lengths.includes(cleanedVal.length)) {
         // Mismatch detected! Play beep, show warning dialog, halt inputs
         playWarningBeep();
         
         state.pendingScan = cleanedVal;
         
+        // Use the first allowed length as reference in the dialog popup
+        const refLength = allowed.lengths[0];
+        const refExample = allowed.examples[refLength];
+        
         if (dom.mismatchScannedSerial) dom.mismatchScannedSerial.textContent = cleanedVal;
         if (dom.mismatchScannedLen) dom.mismatchScannedLen.textContent = `Length: ${cleanedVal.length}`;
-        if (dom.mismatchExpectedSerial) dom.mismatchExpectedSerial.textContent = expected.example;
-        if (dom.mismatchExpectedLen) dom.mismatchExpectedLen.textContent = `Length: ${expected.length}`;
+        if (dom.mismatchExpectedSerial) dom.mismatchExpectedSerial.textContent = refExample;
+        if (dom.mismatchExpectedLen) dom.mismatchExpectedLen.textContent = `Length: ${refLength}`;
         
         if (dom.mismatchModal) dom.mismatchModal.classList.add('active');
         if (dom.scanInput) dom.scanInput.disabled = true;
