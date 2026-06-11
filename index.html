@@ -24,6 +24,152 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <link rel="stylesheet" href="style.css?v=3">
+    <style>
+        /* Embedded styles to guarantee modal displays centered and bypasses browser caching */
+        .modal-container-root {
+            position: absolute !important;
+            width: 0 !important;
+            height: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 9999 !important;
+            overflow: visible !important;
+        }
+        .mismatch-modal {
+            display: none;
+            position: fixed !important;
+            z-index: 10002 !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background-color: rgba(0, 0, 0, 0.85) !important;
+            backdrop-filter: blur(8px) !important;
+            -webkit-backdrop-filter: blur(8px) !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 16px !important;
+        }
+        .mismatch-modal.active {
+            display: flex !important;
+        }
+        .mismatch-modal-content {
+            background-color: #131a26 !important;
+            border: 2px solid #f43f5e !important;
+            border-radius: 16px !important;
+            width: 100% !important;
+            max-width: 550px !important;
+            box-shadow: 0 10px 30px rgba(244, 63, 94, 0.3) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            animation: cardSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+        }
+        .mismatch-modal-header {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            padding: 20px 24px !important;
+            background: rgba(244, 63, 94, 0.08) !important;
+            border-bottom: 1px solid rgba(244, 63, 94, 0.2) !important;
+        }
+        .mismatch-modal-header h3 {
+            font-size: 1.25rem !important;
+            font-weight: 700 !important;
+            color: #f43f5e !important;
+            margin: 0 !important;
+        }
+        .warning-icon {
+            width: 28px !important;
+            height: 28px !important;
+            stroke: #f43f5e !important;
+        }
+        .mismatch-modal-body {
+            padding: 24px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 20px !important;
+            color: #f3f4f6 !important;
+        }
+        .mismatch-modal-body p {
+            font-size: 0.95rem !important;
+            line-height: 1.5 !important;
+            color: #9ca3af !important;
+            margin: 0 !important;
+        }
+        .mismatch-details {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            background: #1b2436 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            gap: 12px !important;
+        }
+        .mismatch-detail-box {
+            flex: 1 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 4px !important;
+        }
+        .detail-label {
+            font-size: 0.75rem !important;
+            color: #6b7280 !important;
+            text-transform: uppercase !important;
+            font-weight: 600 !important;
+        }
+        .detail-val {
+            font-family: 'Courier New', Courier, monospace !important;
+            font-size: 1.05rem !important;
+            font-weight: 700 !important;
+            word-break: break-all !important;
+        }
+        .detail-val.highlight {
+            color: #f43f5e !important;
+        }
+        .detail-len {
+            font-size: 0.8rem !important;
+            font-weight: 600 !important;
+            color: #9ca3af !important;
+        }
+        .mismatch-arrow {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: #6b7280 !important;
+        }
+        .mismatch-prompt {
+            font-weight: 600 !important;
+            text-align: center !important;
+            color: #f3f4f6 !important;
+        }
+        .mismatch-modal-footer {
+            display: flex !important;
+            gap: 16px !important;
+            padding: 20px 24px !important;
+            background: #1b2436 !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+        .btn-reject {
+            background: #131a26 !important;
+            border: 1px solid #f43f5e !important;
+            color: #f43f5e !important;
+            flex: 1 !important;
+        }
+        .btn-reject:hover {
+            background: rgba(244, 63, 94, 0.15) !important;
+        }
+        .btn-approve {
+            background: linear-gradient(135deg, #10b981, #059669) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3) !important;
+            flex: 1.2 !important;
+        }
+        .btn-approve:hover {
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
