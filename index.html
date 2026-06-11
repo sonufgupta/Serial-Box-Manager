@@ -79,8 +79,10 @@
 
         <!-- Main Content Grid -->
         <main class="main-grid">
-            <!-- Left Side: Inputs & Configuration -->
-            <section class="panel input-panel">
+            <!-- Left Column: Inputs & History -->
+            <div class="left-column">
+                <!-- Left Side: Inputs & Configuration -->
+                <section class="panel input-panel">
                 <div class="panel-header">
                     <i data-lucide="sliders-horizontal" class="text-indigo"></i>
                     <h2>Input & Settings</h2>
@@ -92,7 +94,7 @@
                             <span>Sequence Length per Box</span>
                             <span class="label-hint">Automatically generate sequence starting from scanned serial</span>
                         </label>
-                        <label class="switch" style="transform: scale(0.85); transform-origin: top right; margin-top: 2px; cursor: pointer;" title="Toggle Sequence Generation On/Off">
+                        <label class="switch" for="sequenceToggle" style="transform: scale(0.85); transform-origin: top right; margin-top: 2px; cursor: pointer;" title="Toggle Sequence Generation On/Off">
                             <input type="checkbox" id="sequenceToggle" checked>
                             <span class="slider round"></span>
                         </label>
@@ -162,7 +164,19 @@
                 </div>
             </section>
 
-            <!-- Right Side: Outputs -->
+            <!-- Cleared History Log Panel -->
+            <section class="panel history-panel" id="historyPanel">
+                <div class="panel-header">
+                    <i data-lucide="history" class="text-indigo"></i>
+                    <h2>Cleared History Log</h2>
+                </div>
+                <div class="history-container" id="historyContainer">
+                    <div class="empty-list-text" style="padding: 12px 0;">No cleared history found.</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Side: Outputs -->
             <section class="panel output-panel">
                 <div class="panel-header header-tabs">
                     <div class="title-with-icon">
@@ -230,9 +244,46 @@
         </div>
     </div>
 
+    <!-- Length Mismatch Warning Modal -->
+    <div id="mismatchModal" class="mismatch-modal">
+        <div class="mismatch-modal-content">
+            <div class="mismatch-modal-header">
+                <i data-lucide="alert-triangle" class="warning-icon"></i>
+                <h3>Warning: Length Mismatch Detected</h3>
+            </div>
+            <div class="mismatch-modal-body">
+                <p>The scanned serial number has a different character length than expected. If this is correct, you can approve it; otherwise, reject it to discard the scan.</p>
+                <div class="mismatch-details">
+                    <div class="mismatch-detail-box">
+                        <span class="detail-label">Scanned Serial</span>
+                        <span class="detail-val highlight" id="mismatchScannedSerial">-</span>
+                        <span class="detail-len" id="mismatchScannedLen">Length: 0</span>
+                    </div>
+                    <div class="mismatch-arrow">
+                        <i data-lucide="arrow-right"></i>
+                    </div>
+                    <div class="mismatch-detail-box">
+                        <span class="detail-label">Expected (First Scan)</span>
+                        <span class="detail-val" id="mismatchExpectedSerial">-</span>
+                        <span class="detail-len" id="mismatchExpectedLen">Length: 0</span>
+                    </div>
+                </div>
+                <p class="mismatch-prompt">Do you want to Approve (add this serial) or Reject (discard scan)?</p>
+            </div>
+            <div class="mismatch-modal-footer">
+                <button id="btnRejectScan" class="btn btn-secondary btn-lg btn-reject">
+                    <i data-lucide="x-circle"></i> Reject (Discard)
+                </button>
+                <button id="btnApproveScan" class="btn btn-primary btn-lg btn-approve">
+                    <i data-lucide="check-circle"></i> Approve & Add
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

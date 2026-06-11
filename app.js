@@ -34,7 +34,8 @@ const state = {
     scannedSerials: [],
     boxes: [], // { boxIndex: 1, startSerial: '...', sequence: [...], isDuplicate: false }
     flatSerials: [], // all generated items flattened
-    duplicatesCount: 0
+    duplicatesCount: 0,
+    pendingScan: null // holds scanned item awaiting mismatch validation approval
 };
 
 // DOM Elements
@@ -76,7 +77,19 @@ const dom = {
     flatOutput: document.getElementById('flatOutput'),
     btnCopyFlat: document.getElementById('btnCopyFlat'),
     btnDownloadCSV: document.getElementById('btnDownloadCSV'),
-    toastContainer: document.getElementById('toastContainer')
+    toastContainer: document.getElementById('toastContainer'),
+    
+    // Length Mismatch Modal Elements
+    mismatchModal: document.getElementById('mismatchModal'),
+    mismatchScannedSerial: document.getElementById('mismatchScannedSerial'),
+    mismatchScannedLen: document.getElementById('mismatchScannedLen'),
+    mismatchExpectedSerial: document.getElementById('mismatchExpectedSerial'),
+    mismatchExpectedLen: document.getElementById('mismatchExpectedLen'),
+    btnRejectScan: document.getElementById('btnRejectScan'),
+    btnApproveScan: document.getElementById('btnApproveScan'),
+    
+    // History Panel Elements
+    historyContainer: document.getElementById('historyContainer')
 };
 
 // Safe Icon Rendering (handles slow or blocked Lucide script loading)
@@ -400,11 +413,7 @@ dom.scanInput.addEventListener('keypress', (e) => {
         const cleanedVal = cleanSerial(rawVal);
         if (!cleanedVal) return;
         
-        if (state.liveMode) {
-            handleLiveScan(cleanedVal);
-        } else {
-            handleNormalScan(cleanedVal);
-        }
+        validateAndProcessScan(cleanedVal);
         dom.scanInput.value = '';
         dom.scanInput.focus();
     }
@@ -591,11 +600,7 @@ function startCamera() {
         (decodedText) => {
             const cleanedVal = cleanSerial(decodedText);
             if (cleanedVal) {
-                if (state.liveMode) {
-                    handleLiveScan(cleanedVal);
-                } else {
-                    handleNormalScan(cleanedVal);
-                }
+                validateAndProcessScan(cleanedVal);
             }
             stopCamera();
         },
@@ -706,6 +711,9 @@ dom.btnClear.addEventListener('click', () => {
         return;
     }
     
+    // Save current active state to history before clearing
+    saveToHistory();
+    
     if (state.firebaseActive && window.dbRef) {
         dbRef.set(null).then(() => {
             clearLocalState();
@@ -721,6 +729,241 @@ dom.btnClear.addEventListener('click', () => {
         showToast("System cleared locally.", "info");
     }
 });
+
+// --- LENGTH MISMATCH VALIDATION SYSTEM ---
+
+// Expected length detection (first item is the reference)
+function getExpectedSerialLength() {
+    if (state.boxes && state.boxes.length > 0) {
+        return {
+            length: state.boxes[0].startSerial.length,
+            example: state.boxes[0].startSerial
+        };
+    }
+    if (state.scannedSerials && state.scannedSerials.length > 0) {
+        return {
+            length: state.scannedSerials[0].length,
+            example: state.scannedSerials[0]
+        };
+    }
+    return null;
+}
+
+// Validate scanned serial length and show warning modal if mismatched
+function validateAndProcessScan(cleanedVal) {
+    const expected = getExpectedSerialLength();
+    if (expected !== null && cleanedVal.length !== expected.length) {
+        // Mismatch detected! Play beep, show warning dialog, halt inputs
+        playWarningBeep();
+        
+        state.pendingScan = cleanedVal;
+        
+        if (dom.mismatchScannedSerial) dom.mismatchScannedSerial.textContent = cleanedVal;
+        if (dom.mismatchScannedLen) dom.mismatchScannedLen.textContent = `Length: ${cleanedVal.length}`;
+        if (dom.mismatchExpectedSerial) dom.mismatchExpectedSerial.textContent = expected.example;
+        if (dom.mismatchExpectedLen) dom.mismatchExpectedLen.textContent = `Length: ${expected.length}`;
+        
+        if (dom.mismatchModal) dom.mismatchModal.classList.add('active');
+        if (dom.scanInput) dom.scanInput.disabled = true;
+    } else {
+        // Safe length or first scan: process normally
+        processScan(cleanedVal);
+    }
+}
+
+// Process valid or approved scans
+function processScan(cleanedVal) {
+    if (state.liveMode) {
+        handleLiveScan(cleanedVal);
+    } else {
+        handleNormalScan(cleanedVal);
+    }
+}
+
+// Length mismatch modal button handlers
+if (dom.btnRejectScan) {
+    dom.btnRejectScan.addEventListener('click', () => {
+        if (dom.mismatchModal) dom.mismatchModal.classList.remove('active');
+        if (dom.scanInput) {
+            dom.scanInput.disabled = false;
+            dom.scanInput.focus();
+        }
+        state.pendingScan = null;
+        showToast("Scan rejected.", "info");
+    });
+}
+
+if (dom.btnApproveScan) {
+    dom.btnApproveScan.addEventListener('click', () => {
+        if (dom.mismatchModal) dom.mismatchModal.classList.remove('active');
+        if (dom.scanInput) {
+            dom.scanInput.disabled = false;
+            dom.scanInput.focus();
+        }
+        if (state.pendingScan) {
+            processScan(state.pendingScan);
+            state.pendingScan = null;
+        }
+    });
+}
+
+// --- CLEARED HISTORY LOG SYSTEM ---
+
+// Save cleared session data to history log
+function saveToHistory() {
+    const hasBoxes = state.boxes && state.boxes.length > 0;
+    const hasScanned = state.scannedSerials && state.scannedSerials.length > 0;
+    const hasBulkText = dom.bulkInput && dom.bulkInput.value.trim() !== '';
+    
+    if (!hasBoxes && !hasScanned && !hasBulkText) {
+        return; // nothing to save
+    }
+    
+    try {
+        const historyData = localStorage.getItem('serial_manager_history');
+        let history = historyData ? JSON.parse(historyData) : [];
+        
+        const now = new Date();
+        const options = { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            hour12: true 
+        };
+        const timestampStr = now.toLocaleString('en-US', options);
+        
+        // Build readable summary
+        let summaryParts = [];
+        if (hasBoxes) {
+            const totalSerials = state.flatSerials ? state.flatSerials.length : 0;
+            summaryParts.push(`${state.boxes.length} Box${state.boxes.length > 1 ? 'es' : ''} (${totalSerials} Serials)`);
+        }
+        if (hasScanned) {
+            summaryParts.push(`${state.scannedSerials.length} Scanned`);
+        }
+        if (hasBulkText && !hasBoxes) {
+            summaryParts.push("Bulk Text");
+        }
+        const summary = summaryParts.join(', ') || 'Saved Session';
+        
+        const newEntry = {
+            id: 'hist_' + now.getTime(),
+            timestamp: timestampStr,
+            summary: summary,
+            boxes: state.boxes || [],
+            scannedSerials: state.scannedSerials || [],
+            bulkInput: dom.bulkInput ? dom.bulkInput.value : ''
+        };
+        
+        history.unshift(newEntry);
+        
+        // Keep last 20 entries
+        if (history.length > 20) {
+            history = history.slice(0, 20);
+        }
+        
+        localStorage.setItem('serial_manager_history', JSON.stringify(history));
+        renderHistory();
+    } catch (e) {
+        console.error("Failed to save session to history:", e);
+    }
+}
+
+// Render history list inside panel container
+function renderHistory() {
+    if (!dom.historyContainer) return;
+    
+    try {
+        const historyData = localStorage.getItem('serial_manager_history');
+        const history = historyData ? JSON.parse(historyData) : [];
+        
+        if (history.length === 0) {
+            dom.historyContainer.innerHTML = `
+                <div class="empty-list-text" style="padding: 12px 0;">No cleared history found.</div>
+            `;
+            return;
+        }
+        
+        dom.historyContainer.innerHTML = history.map(item => `
+            <div class="history-card">
+                <div class="history-info">
+                    <span class="history-time">${item.timestamp}</span>
+                    <span class="history-summary">${item.summary}</span>
+                </div>
+                <div class="history-actions">
+                    <button class="btn-restore-history" onclick="restoreHistory('${item.id}')" title="Restore this data">
+                        Restore
+                    </button>
+                    <button class="btn-delete-history" onclick="deleteHistory('${item.id}')" title="Delete history entry">
+                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        renderIcons();
+    } catch (e) {
+        console.error("Failed to render history list:", e);
+    }
+}
+
+// Restore a history entry
+window.restoreHistory = function(id) {
+    try {
+        const historyData = localStorage.getItem('serial_manager_history');
+        if (!historyData) return;
+        const history = JSON.parse(historyData);
+        const entry = history.find(h => h.id === id);
+        if (!entry) return;
+        
+        if (confirm(`Are you sure you want to restore the history from ${entry.timestamp}? This will replace your current active list.`)) {
+            // Restore active state
+            state.boxes = entry.boxes || [];
+            state.scannedSerials = entry.scannedSerials || [];
+            if (dom.bulkInput) {
+                dom.bulkInput.value = entry.bulkInput || '';
+            }
+            
+            // Save state locally
+            saveLocalData();
+            saveScannedSerials();
+            renderScannedList();
+            
+            // Sync to Firebase if online
+            if (state.firebaseActive && window.dbRef) {
+                dbRef.set(state.boxes).then(() => {
+                    showToast("History data restored and synced to cloud.", "success");
+                }).catch(err => {
+                    console.error("Firebase sync failed on restore:", err);
+                    showToast("History data restored locally (cloud sync failed).", "warning");
+                });
+            } else {
+                showToast("History data restored locally.", "success");
+            }
+        }
+    } catch (e) {
+        console.error("Failed to restore history:", e);
+        showToast("Error restoring history data.", "error");
+    }
+};
+
+// Delete a history entry
+window.deleteHistory = function(id) {
+    try {
+        const historyData = localStorage.getItem('serial_manager_history');
+        if (!historyData) return;
+        const history = JSON.parse(historyData);
+        const updatedHistory = history.filter(h => h.id !== id);
+        localStorage.setItem('serial_manager_history', JSON.stringify(updatedHistory));
+        renderHistory();
+        showToast("History entry deleted.", "info");
+    } catch (e) {
+        console.error("Failed to delete history:", e);
+    }
+};
 
 // Parse Serial Sequences
 function parseStartingSerials() {
@@ -1010,6 +1253,7 @@ handleQueryParams();
 registerFileLaunchHandler();
 updateStats();
 updateSyncBadge();
+renderHistory();
 
 // Parse query parameters from PWA shortcuts / share targets / protocols
 function handleQueryParams() {
