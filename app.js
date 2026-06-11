@@ -35,7 +35,8 @@ const state = {
     boxes: [], // { boxIndex: 1, startSerial: '...', sequence: [...], isDuplicate: false }
     flatSerials: [], // all generated items flattened
     duplicatesCount: 0,
-    pendingScan: null // holds scanned item awaiting mismatch validation approval
+    pendingScan: null, // holds scanned item awaiting mismatch validation approval
+    allowedLengths: new Set() // Whitelisted serial character lengths
 };
 
 // DOM Elements
@@ -691,6 +692,9 @@ function clearLocalState() {
     state.boxes = [];
     state.flatSerials = [];
     state.duplicatesCount = 0;
+    if (state.allowedLengths) {
+        state.allowedLengths.clear();
+    }
     dom.bulkInput.value = '';
     dom.scanInput.value = '';
     dom.flatOutput.value = '';
@@ -732,46 +736,50 @@ dom.btnClear.addEventListener('click', () => {
 
 // --- LENGTH MISMATCH VALIDATION SYSTEM ---
 
-// Get all allowed serial lengths based on currently active scans and boxes
-function getAllowedSerialLengths() {
-    const lengths = new Set();
-    const examples = {};
-    
+// Sync whitelisted lengths from active state (boxes and scans)
+function updateAllowedLengthsFromState() {
     if (state.boxes && state.boxes.length > 0) {
         state.boxes.forEach(box => {
             if (box.startSerial) {
-                lengths.add(box.startSerial.length);
-                examples[box.startSerial.length] = box.startSerial;
+                state.allowedLengths.add(box.startSerial.length);
             }
         });
     }
-    
     if (state.scannedSerials && state.scannedSerials.length > 0) {
         state.scannedSerials.forEach(serial => {
-            lengths.add(serial.length);
-            examples[serial.length] = serial;
+            state.allowedLengths.add(serial.length);
         });
     }
-    
-    return {
-        lengths: Array.from(lengths),
-        examples: examples
-    };
+}
+
+// Find a starting serial example for a specific length from the active data
+function getExampleForLength(len) {
+    if (state.boxes) {
+        const found = state.boxes.find(b => b.startSerial && b.startSerial.length === len);
+        if (found) return found.startSerial;
+    }
+    if (state.scannedSerials) {
+        const found = state.scannedSerials.find(s => s.length === len);
+        if (found) return found;
+    }
+    return "Serial of length " + len;
 }
 
 // Validate scanned serial length and show warning modal if mismatched
 function validateAndProcessScan(cleanedVal) {
-    const allowed = getAllowedSerialLengths();
+    // 1. Sync allowed lengths from database/local lists
+    updateAllowedLengthsFromState();
     
-    if (allowed.lengths.length > 0 && !allowed.lengths.includes(cleanedVal.length)) {
-        // Mismatch detected! Play beep, show warning dialog, halt inputs
+    // 2. Perform validation check
+    if (state.allowedLengths.size > 0 && !state.allowedLengths.has(cleanedVal.length)) {
+        // Mismatch detected! Play warning beep, show dialog, halt inputs
         playWarningBeep();
         
         state.pendingScan = cleanedVal;
         
-        // Use the first allowed length as reference in the dialog popup
-        const refLength = allowed.lengths[0];
-        const refExample = allowed.examples[refLength];
+        // Use the first allowed length as reference in the warning popup
+        const refLength = Array.from(state.allowedLengths)[0];
+        const refExample = getExampleForLength(refLength);
         
         if (dom.mismatchScannedSerial) dom.mismatchScannedSerial.textContent = cleanedVal;
         if (dom.mismatchScannedLen) dom.mismatchScannedLen.textContent = `Length: ${cleanedVal.length}`;
@@ -816,6 +824,9 @@ if (dom.btnApproveScan) {
             dom.scanInput.focus();
         }
         if (state.pendingScan) {
+            // IMMEDIATELY whitelist the approved length locally
+            state.allowedLengths.add(state.pendingScan.length);
+            
             processScan(state.pendingScan);
             state.pendingScan = null;
         }

@@ -1,11 +1,11 @@
-const CACHE_NAME = 'serial-manager-cache-v3';
+const CACHE_NAME = 'serial-manager-cache-v4';
 const OFFLINE_FALLBACK = 'offline.html';
 
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=3',
-  './app.js?v=3',
+  './style.css?v=4',
+  './app.js?v=4',
   './manifest.json',
   './offline.html'
 ];
