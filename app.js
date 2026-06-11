@@ -29,6 +29,7 @@ const state = {
     activeInputTab: 'bulk', // 'bulk' | 'scan'
     activeOutputTab: 'grouped', // 'grouped' | 'flat'
     liveMode: false,
+    singleProductMode: false,
     firebaseActive: true, // Defaults to true, toggles to false if Firebase permissions or connection fails
     scannedSerials: [],
     boxes: [], // { boxIndex: 1, startSerial: '...', sequence: [...], isDuplicate: false }
@@ -54,6 +55,7 @@ const dom = {
     outTabContents: document.querySelectorAll('.out-tab-content'),
     
     seqLength: document.getElementById('seqLength'),
+    singleProductToggle: document.getElementById('singleProductToggle'),
     liveModeToggle: document.getElementById('liveModeToggle'),
     bulkInput: document.getElementById('bulkInput'),
     scanInput: document.getElementById('scanInput'),
@@ -208,6 +210,7 @@ function saveSettings() {
     try {
         localStorage.setItem('local_seq_length', dom.seqLength.value);
         localStorage.setItem('local_live_mode', state.liveMode);
+        localStorage.setItem('local_single_product_mode', state.singleProductMode);
         localStorage.setItem('local_active_input_tab', state.activeInputTab);
         localStorage.setItem('local_active_output_tab', state.activeOutputTab);
     } catch (e) {
@@ -237,6 +240,18 @@ function restoreState() {
         } else {
             state.liveMode = false;
             dom.liveModeToggle.checked = false;
+        }
+
+        // Restore Single Product Mode
+        const savedSingleProduct = localStorage.getItem('local_single_product_mode');
+        if (savedSingleProduct === 'true') {
+            state.singleProductMode = true;
+            dom.singleProductToggle.checked = true;
+            dom.seqLength.disabled = true;
+        } else {
+            state.singleProductMode = false;
+            dom.singleProductToggle.checked = false;
+            dom.seqLength.disabled = false;
         }
         
         // 4. Tabs Status
@@ -340,6 +355,25 @@ dom.liveModeToggle.addEventListener('change', () => {
     }
 });
 
+dom.singleProductToggle.addEventListener('change', () => {
+    state.singleProductMode = dom.singleProductToggle.checked;
+    dom.seqLength.disabled = state.singleProductMode;
+    saveSettings();
+    if (state.singleProductMode) {
+        showToast("Single Product Mode Enabled (No sequence generation)", "info");
+        if (!state.firebaseActive) {
+            recalculateDuplicates();
+            saveLocalData();
+        }
+    } else {
+        showToast("Single Product Mode Disabled (Sequence generation active)", "info");
+        if (!state.firebaseActive) {
+            recalculateDuplicates();
+            saveLocalData();
+        }
+    }
+});
+
 dom.seqLength.addEventListener('change', () => {
     saveSettings();
     if (!state.firebaseActive) {
@@ -388,8 +422,8 @@ function handleNormalScan(cleanedVal) {
 }
 
 function handleLiveScan(cleanedVal) {
-    const count = parseInt(dom.seqLength.value, 10);
-    if (isNaN(count) || count < 1) {
+    const count = state.singleProductMode ? 0 : parseInt(dom.seqLength.value, 10);
+    if (!state.singleProductMode && (isNaN(count) || count < 1)) {
         playWarningBeep();
         showToast("Please enter a valid sequence length.", "warning");
         return;
@@ -417,7 +451,8 @@ function handleLiveScan(cleanedVal) {
                 showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate.`, 'error');
             } else {
                 playSuccessBeep();
-                showToast(`Box ${newBoxIndex} added. Generated next ${count} serials.`, 'success');
+                const msg = state.singleProductMode ? `Box ${newBoxIndex} added.` : `Box ${newBoxIndex} added. Generated next ${count} serials.`;
+                showToast(msg, 'success');
             }
         }).catch(err => {
             console.error("Firebase write error. Switching to Local Mode:", err);
@@ -430,7 +465,8 @@ function handleLiveScan(cleanedVal) {
                 showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate (Local).`, 'error');
             } else {
                 playSuccessBeep();
-                showToast(`Box ${newBoxIndex} added locally.`, 'success');
+                const msg = state.singleProductMode ? `Box ${newBoxIndex} added locally.` : `Box ${newBoxIndex} added locally.`;
+                showToast(msg, 'success');
             }
         });
     } else {
@@ -441,7 +477,8 @@ function handleLiveScan(cleanedVal) {
             showToast(`Scan Rejected! Starting serial "${cleanedVal}" is a duplicate (Local).`, 'error');
         } else {
             playSuccessBeep();
-            showToast(`Box ${newBoxIndex} added locally.`, 'success');
+            const msg = state.singleProductMode ? `Box ${newBoxIndex} added locally.` : `Box ${newBoxIndex} added locally.`;
+            showToast(msg, 'success');
         }
     }
     
@@ -660,6 +697,13 @@ function clearLocalState() {
 
 // Clear all inputs and state
 dom.btnClear.addEventListener('click', () => {
+    const password = prompt("Enter passcode to Clear All data:");
+    if (password !== "2026") {
+        playWarningBeep();
+        showToast("Incorrect passcode. Action cancelled.", "error");
+        return;
+    }
+    
     if (state.firebaseActive && window.dbRef) {
         dbRef.set(null).then(() => {
             clearLocalState();
@@ -732,14 +776,14 @@ function generateSequence(startSerial, count) {
 // Bulk Generation Click handler (Synchronized or local fallback)
 dom.btnGenerate.addEventListener('click', () => {
     const startSerials = parseStartingSerials();
-    const count = parseInt(dom.seqLength.value, 10);
+    const count = state.singleProductMode ? 0 : parseInt(dom.seqLength.value, 10);
     
     if (startSerials.length === 0) {
         playWarningBeep();
         showToast("Please input or scan at least one starting serial number.", "warning");
         return;
     }
-    if (isNaN(count) || count < 1) {
+    if (!state.singleProductMode && (isNaN(count) || count < 1)) {
         playWarningBeep();
         showToast("Please enter a valid sequence length (minimum 1).", "warning");
         return;
