@@ -1378,3 +1378,13 @@ input:checked + .slider:before {
 .btn-approve:hover {
     box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
 }
+
+/* Modals Container to isolate fixed overlays from body flex alignment */
+.modal-container-root {
+    position: absolute;
+    width: 0;
+    height: 0;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+}

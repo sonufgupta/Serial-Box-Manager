@@ -4,8 +4,8 @@ const OFFLINE_FALLBACK = 'offline.html';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
+  './style.css?v=3',
+  './app.js?v=3',
   './manifest.json',
   './offline.html'
 ];

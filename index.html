@@ -23,7 +23,7 @@
     <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
     <div class="app-container">
@@ -226,57 +226,60 @@
         </main>
     </div>
 
-    <!-- Camera Scanner Overlay -->
-    <div id="cameraModal" class="camera-modal">
-        <div class="camera-modal-content">
-            <div class="camera-modal-header">
-                <h3>Camera Barcode Scanner</h3>
-                <button id="btnCloseCamera" class="btn btn-icon btn-close-modal" title="Close Camera">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-            <div class="camera-viewport-wrapper">
-                <div id="cameraReader"></div>
-            </div>
-            <div class="camera-modal-footer">
-                <p>Align the barcode within the camera viewport to scan automatically.</p>
+    <!-- Modals Container Root to isolate fixed overlays from body flex alignment -->
+    <div class="modal-container-root">
+        <!-- Camera Scanner Overlay -->
+        <div id="cameraModal" class="camera-modal">
+            <div class="camera-modal-content">
+                <div class="camera-modal-header">
+                    <h3>Camera Barcode Scanner</h3>
+                    <button id="btnCloseCamera" class="btn btn-icon btn-close-modal" title="Close Camera">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="camera-viewport-wrapper">
+                    <div id="cameraReader"></div>
+                </div>
+                <div class="camera-modal-footer">
+                    <p>Align the barcode within the camera viewport to scan automatically.</p>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Length Mismatch Warning Modal -->
-    <div id="mismatchModal" class="mismatch-modal">
-        <div class="mismatch-modal-content">
-            <div class="mismatch-modal-header">
-                <i data-lucide="alert-triangle" class="warning-icon"></i>
-                <h3>Warning: Length Mismatch Detected</h3>
-            </div>
-            <div class="mismatch-modal-body">
-                <p>The scanned serial number has a different character length than expected. If this is correct, you can approve it; otherwise, reject it to discard the scan.</p>
-                <div class="mismatch-details">
-                    <div class="mismatch-detail-box">
-                        <span class="detail-label">Scanned Serial</span>
-                        <span class="detail-val highlight" id="mismatchScannedSerial">-</span>
-                        <span class="detail-len" id="mismatchScannedLen">Length: 0</span>
-                    </div>
-                    <div class="mismatch-arrow">
-                        <i data-lucide="arrow-right"></i>
-                    </div>
-                    <div class="mismatch-detail-box">
-                        <span class="detail-label">Expected (First Scan)</span>
-                        <span class="detail-val" id="mismatchExpectedSerial">-</span>
-                        <span class="detail-len" id="mismatchExpectedLen">Length: 0</span>
-                    </div>
+        <!-- Length Mismatch Warning Modal -->
+        <div id="mismatchModal" class="mismatch-modal">
+            <div class="mismatch-modal-content">
+                <div class="mismatch-modal-header">
+                    <i data-lucide="alert-triangle" class="warning-icon"></i>
+                    <h3>Warning: Length Mismatch Detected</h3>
                 </div>
-                <p class="mismatch-prompt">Do you want to Approve (add this serial) or Reject (discard scan)?</p>
-            </div>
-            <div class="mismatch-modal-footer">
-                <button id="btnRejectScan" class="btn btn-secondary btn-lg btn-reject">
-                    <i data-lucide="x-circle"></i> Reject (Discard)
-                </button>
-                <button id="btnApproveScan" class="btn btn-primary btn-lg btn-approve">
-                    <i data-lucide="check-circle"></i> Approve & Add
-                </button>
+                <div class="mismatch-modal-body">
+                    <p>The scanned serial number has a different character length than expected. If this is correct, you can approve it; otherwise, reject it to discard the scan.</p>
+                    <div class="mismatch-details">
+                        <div class="mismatch-detail-box">
+                            <span class="detail-label">Scanned Serial</span>
+                            <span class="detail-val highlight" id="mismatchScannedSerial">-</span>
+                            <span class="detail-len" id="mismatchScannedLen">Length: 0</span>
+                        </div>
+                        <div class="mismatch-arrow">
+                            <i data-lucide="arrow-right"></i>
+                        </div>
+                        <div class="mismatch-detail-box">
+                            <span class="detail-label">Expected (First Scan)</span>
+                            <span class="detail-val" id="mismatchExpectedSerial">-</span>
+                            <span class="detail-len" id="mismatchExpectedLen">Length: 0</span>
+                        </div>
+                    </div>
+                    <p class="mismatch-prompt">Do you want to Approve (add this serial) or Reject (discard scan)?</p>
+                </div>
+                <div class="mismatch-modal-footer">
+                    <button id="btnRejectScan" class="btn btn-secondary btn-lg btn-reject">
+                        <i data-lucide="x-circle"></i> Reject (Discard)
+                    </button>
+                    <button id="btnApproveScan" class="btn btn-primary btn-lg btn-approve">
+                        <i data-lucide="check-circle"></i> Approve & Add
+                    </button>
+                </div>
             </div>
         </div>
     </div>
