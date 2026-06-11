@@ -55,7 +55,7 @@ const dom = {
     outTabContents: document.querySelectorAll('.out-tab-content'),
     
     seqLength: document.getElementById('seqLength'),
-    singleProductToggle: document.getElementById('singleProductToggle'),
+    sequenceToggle: document.getElementById('sequenceToggle'),
     liveModeToggle: document.getElementById('liveModeToggle'),
     bulkInput: document.getElementById('bulkInput'),
     scanInput: document.getElementById('scanInput'),
@@ -242,15 +242,15 @@ function restoreState() {
             dom.liveModeToggle.checked = false;
         }
 
-        // Restore Single Product Mode
+        // Restore Sequence Toggle Status
         const savedSingleProduct = localStorage.getItem('local_single_product_mode');
         if (savedSingleProduct === 'true') {
             state.singleProductMode = true;
-            dom.singleProductToggle.checked = true;
+            if (dom.sequenceToggle) dom.sequenceToggle.checked = false;
             dom.seqLength.disabled = true;
         } else {
             state.singleProductMode = false;
-            dom.singleProductToggle.checked = false;
+            if (dom.sequenceToggle) dom.sequenceToggle.checked = true;
             dom.seqLength.disabled = false;
         }
         
@@ -355,24 +355,26 @@ dom.liveModeToggle.addEventListener('change', () => {
     }
 });
 
-dom.singleProductToggle.addEventListener('change', () => {
-    state.singleProductMode = dom.singleProductToggle.checked;
-    dom.seqLength.disabled = state.singleProductMode;
-    saveSettings();
-    if (state.singleProductMode) {
-        showToast("Single Product Mode Enabled (No sequence generation)", "info");
-        if (!state.firebaseActive) {
-            recalculateDuplicates();
-            saveLocalData();
+if (dom.sequenceToggle) {
+    dom.sequenceToggle.addEventListener('change', () => {
+        state.singleProductMode = !dom.sequenceToggle.checked;
+        dom.seqLength.disabled = state.singleProductMode;
+        saveSettings();
+        if (state.singleProductMode) {
+            showToast("Sequence Generation Disabled (Single Product Mode)", "info");
+            if (!state.firebaseActive) {
+                recalculateDuplicates();
+                saveLocalData();
+            }
+        } else {
+            showToast("Sequence Generation Enabled", "success");
+            if (!state.firebaseActive) {
+                recalculateDuplicates();
+                saveLocalData();
+            }
         }
-    } else {
-        showToast("Single Product Mode Disabled (Sequence generation active)", "info");
-        if (!state.firebaseActive) {
-            recalculateDuplicates();
-            saveLocalData();
-        }
-    }
-});
+    });
+}
 
 dom.seqLength.addEventListener('change', () => {
     saveSettings();

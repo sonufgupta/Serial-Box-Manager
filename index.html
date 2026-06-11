@@ -87,27 +87,20 @@
                 </div>
 
                 <div class="control-group">
-                    <label for="seqLength">
-                        <span>Sequence Length per Box</span>
-                        <span class="label-hint">Total serials to generate starting from each scanned serial</span>
-                    </label>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px;">
+                        <label for="seqLength" style="margin: 0; cursor: pointer;">
+                            <span>Sequence Length per Box</span>
+                            <span class="label-hint">Automatically generate sequence starting from scanned serial</span>
+                        </label>
+                        <label class="switch" style="transform: scale(0.85); transform-origin: top right; margin-top: 2px; cursor: pointer;" title="Toggle Sequence Generation On/Off">
+                            <input type="checkbox" id="sequenceToggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
                     <div class="number-input-wrapper">
                         <input type="number" id="seqLength" min="1" max="1000" value="10">
                         <span class="input-suffix">serials/box</span>
                     </div>
-                </div>
-
-                <div class="control-group toggle-group" style="margin-top: -8px; margin-bottom: 8px;">
-                    <label class="toggle-label" for="singleProductToggle">
-                        <div class="toggle-title">
-                            <span>Single Product Mode</span>
-                            <span class="label-hint">Scan starting serial only (No sequence generation)</span>
-                        </div>
-                        <div class="switch">
-                            <input type="checkbox" id="singleProductToggle">
-                            <span class="slider round"></span>
-                        </div>
-                    </label>
                 </div>
 
                 <div class="control-group toggle-group">
@@ -240,6 +233,6 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 </html>
