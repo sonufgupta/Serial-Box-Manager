@@ -36,7 +36,11 @@ const state = {
     flatSerials: [], // all generated items flattened
     duplicatesCount: 0,
     pendingScan: null, // holds scanned item awaiting mismatch validation approval
-    allowedLengths: new Set() // Whitelisted serial character lengths
+    allowedLengths: new Set(), // Whitelisted serial character lengths
+    vehicleNumber: null,
+    productName: null,
+    productList: ["Smart TV", "LED Panel", "Refrigerator", "Washing Machine", "Air Conditioner", "Solar Battery"],
+    sessionSkipped: false
 };
 
 // DOM Elements
@@ -90,7 +94,23 @@ const dom = {
     btnApproveScan: document.getElementById('btnApproveScan'),
     
     // History Panel Elements
-    historyContainer: document.getElementById('historyContainer')
+    historyContainer: document.getElementById('historyContainer'),
+    
+    // Session Setup Modal Elements
+    sessionSetupModal: document.getElementById('sessionSetupModal'),
+    setupVehicleInput: document.getElementById('setupVehicleInput'),
+    setupProductSelect: document.getElementById('setupProductSelect'),
+    customProductWrapper: document.getElementById('customProductWrapper'),
+    setupCustomProductInput: document.getElementById('setupCustomProductInput'),
+    btnStartSession: document.getElementById('btnStartSession'),
+    sessionInfoBar: document.getElementById('sessionInfoBar'),
+    infoVehicleNumber: document.getElementById('infoVehicleNumber'),
+    btnEditVehicle: document.getElementById('btnEditVehicle'),
+    bannerProductSelect: document.getElementById('bannerProductSelect'),
+    btnDeleteProduct: document.getElementById('btnDeleteProduct'),
+    infoProductStatic: document.getElementById('infoProductStatic'),
+    btnSetupSession: document.getElementById('btnSetupSession'),
+    btnSkipSetup: document.getElementById('btnSkipSetup')
 };
 
 // Safe Icon Rendering (handles slow or blocked Lucide script loading)
@@ -147,6 +167,286 @@ function showToast(message, type = 'info') {
     }, 4500); 
 }
 
+// // --- SESSION SETUP & VEHICLE/PRODUCT INFO BAR ---
+
+function toggleAppInputs(disable) {
+    if (dom.scanInput) dom.scanInput.disabled = disable;
+    if (dom.bulkInput) dom.bulkInput.disabled = disable;
+    if (dom.btnGenerate) dom.btnGenerate.disabled = disable;
+    if (dom.btnStartCamera) dom.btnStartCamera.disabled = disable;
+}
+
+function checkStartupModal() {
+    if (!state.vehicleNumber || !state.productName) {
+        if (state.sessionSkipped) {
+            if (dom.sessionSetupModal) {
+                dom.sessionSetupModal.classList.remove('active');
+            }
+            if (dom.sessionInfoBar) {
+                dom.sessionInfoBar.style.display = 'flex';
+            }
+            if (dom.infoVehicleNumber) {
+                dom.infoVehicleNumber.textContent = 'None (View Only)';
+            }
+            if (dom.btnEditVehicle) dom.btnEditVehicle.style.display = 'none';
+            if (dom.bannerProductSelect) dom.bannerProductSelect.style.display = 'none';
+            if (dom.infoProductStatic) {
+                dom.infoProductStatic.style.display = 'inline';
+                dom.infoProductStatic.textContent = 'None (View Only)';
+            }
+            if (dom.btnSetupSession) dom.btnSetupSession.style.display = 'inline-flex';
+            toggleAppInputs(true);
+        } else {
+            if (dom.sessionSetupModal) {
+                dom.sessionSetupModal.classList.add('active');
+            }
+            if (dom.sessionInfoBar) {
+                dom.sessionInfoBar.style.display = 'none';
+            }
+            toggleAppInputs(true);
+        }
+    } else {
+        if (dom.sessionSetupModal) {
+            dom.sessionSetupModal.classList.remove('active');
+        }
+        if (dom.sessionInfoBar) {
+            dom.sessionInfoBar.style.display = 'flex';
+        }
+        if (dom.infoVehicleNumber) {
+            dom.infoVehicleNumber.textContent = state.vehicleNumber;
+        }
+        if (dom.btnEditVehicle) dom.btnEditVehicle.style.display = 'inline-block';
+        if (dom.bannerProductSelect) dom.bannerProductSelect.style.display = 'inline-block';
+        if (dom.infoProductStatic) dom.infoProductStatic.style.display = 'none';
+        if (dom.btnSetupSession) dom.btnSetupSession.style.display = 'none';
+        
+        renderBannerProductDropdown();
+        toggleAppInputs(false);
+    }
+}
+
+function renderProductDropdown() {
+    if (!dom.setupProductSelect) return;
+    
+    const currentVal = dom.setupProductSelect.value;
+    
+    let html = '<option value="" disabled selected>-- Select Product --</option>';
+    if (state.productList && Array.isArray(state.productList)) {
+        state.productList.forEach(product => {
+            html += `<option value="${product}">${product}</option>`;
+        });
+    }
+    html += '<option value="custom">[Add Custom Product...]</option>';
+    
+    dom.setupProductSelect.innerHTML = html;
+    
+    // Restore previous value if it still exists, else clear
+    if (currentVal && (state.productList.includes(currentVal) || currentVal === 'custom')) {
+        dom.setupProductSelect.value = currentVal;
+    } else {
+        dom.setupProductSelect.value = '';
+    }
+    
+    updateDeleteProductButtonVisibility();
+}
+
+function renderBannerProductDropdown() {
+    if (!dom.bannerProductSelect) return;
+    
+    let html = '';
+    if (state.productList && Array.isArray(state.productList)) {
+        state.productList.forEach(product => {
+            html += `<option value="${product}">${product}</option>`;
+        });
+    }
+    html += '<option value="custom">[Add Custom Product...]</option>';
+    
+    dom.bannerProductSelect.innerHTML = html;
+    
+    if (state.productName && state.productList.includes(state.productName)) {
+        dom.bannerProductSelect.value = state.productName;
+    } else {
+        dom.bannerProductSelect.value = '';
+    }
+}
+
+function updateDeleteProductButtonVisibility() {
+    if (!dom.btnDeleteProduct) return;
+    const selectVal = dom.setupProductSelect ? dom.setupProductSelect.value : '';
+    if (selectVal && selectVal !== 'custom') {
+        dom.btnDeleteProduct.style.display = 'flex';
+    } else {
+        dom.btnDeleteProduct.style.display = 'none';
+    }
+}
+
+function saveProductList() {
+    localStorage.setItem('local_product_list', JSON.stringify(state.productList));
+    if (state.firebaseActive && window.database) {
+        database.ref('products').set(state.productList);
+    }
+}
+
+function validateSetupInputs() {
+    const vehicleVal = dom.setupVehicleInput ? dom.setupVehicleInput.value.trim() : '';
+    const selectVal = dom.setupProductSelect ? dom.setupProductSelect.value : '';
+    let productVal = '';
+    
+    if (selectVal === 'custom') {
+        productVal = dom.setupCustomProductInput ? dom.setupCustomProductInput.value.trim() : '';
+    } else if (selectVal) {
+        productVal = selectVal;
+    }
+    
+    const isValid = (vehicleVal.length > 0) && (productVal.length > 0);
+    if (dom.btnStartSession) {
+        dom.btnStartSession.disabled = !isValid;
+    }
+}
+
+// Bind Session Setup Listeners
+if (dom.setupProductSelect) {
+    dom.setupProductSelect.addEventListener('change', () => {
+        const selectVal = dom.setupProductSelect.value;
+        if (selectVal === 'custom') {
+            if (dom.customProductWrapper) dom.customProductWrapper.classList.add('active');
+            if (dom.setupCustomProductInput) dom.setupCustomProductInput.focus();
+        } else {
+            if (dom.customProductWrapper) dom.customProductWrapper.classList.remove('active');
+            if (dom.setupCustomProductInput) dom.setupCustomProductInput.value = '';
+        }
+        updateDeleteProductButtonVisibility();
+        validateSetupInputs();
+    });
+}
+
+if (dom.setupVehicleInput) {
+    dom.setupVehicleInput.addEventListener('input', validateSetupInputs);
+}
+
+if (dom.setupCustomProductInput) {
+    dom.setupCustomProductInput.addEventListener('input', validateSetupInputs);
+}
+
+if (dom.btnDeleteProduct) {
+    dom.btnDeleteProduct.addEventListener('click', () => {
+        const selectVal = dom.setupProductSelect ? dom.setupProductSelect.value : '';
+        if (!selectVal || selectVal === 'custom') return;
+        
+        if (confirm(`Are you sure you want to delete "${selectVal}" from the product list?`)) {
+            state.productList = state.productList.filter(p => p !== selectVal);
+            saveProductList();
+            renderProductDropdown();
+            renderBannerProductDropdown();
+            validateSetupInputs();
+            showToast(`Product "${selectVal}" deleted.`, "info");
+        }
+    });
+}
+
+if (dom.btnSkipSetup) {
+    dom.btnSkipSetup.addEventListener('click', () => {
+        state.sessionSkipped = true;
+        checkStartupModal();
+        showToast("Operating in View-Only Mode.", "info");
+    });
+}
+
+if (dom.btnSetupSession) {
+    dom.btnSetupSession.addEventListener('click', () => {
+        state.sessionSkipped = false;
+        checkStartupModal();
+    });
+}
+
+if (dom.btnStartSession) {
+    dom.btnStartSession.addEventListener('click', () => {
+        const vehicleVal = dom.setupVehicleInput ? dom.setupVehicleInput.value.trim() : '';
+        const selectVal = dom.setupProductSelect ? dom.setupProductSelect.value : '';
+        let productVal = '';
+        
+        if (selectVal === 'custom') {
+            productVal = dom.setupCustomProductInput ? dom.setupCustomProductInput.value.trim() : '';
+            // Save new product automatically to list
+            if (productVal && !state.productList.includes(productVal)) {
+                state.productList.push(productVal);
+                saveProductList();
+                renderProductDropdown();
+            }
+        } else if (selectVal) {
+            productVal = selectVal;
+        }
+        
+        if (!vehicleVal || !productVal) return;
+        
+        state.sessionSkipped = false;
+        state.vehicleNumber = vehicleVal;
+        state.productName = productVal;
+        
+        localStorage.setItem('local_vehicle_number', vehicleVal);
+        localStorage.setItem('local_product_name', productVal);
+        
+        if (state.firebaseActive && window.database) {
+            database.ref('vehicleNumber').set(vehicleVal);
+            database.ref('productName').set(productVal);
+        }
+        
+        checkStartupModal();
+        playSuccessBeep();
+        showToast("Session details saved successfully.", "success");
+    });
+}
+
+// Bind Banner Controls
+if (dom.bannerProductSelect) {
+    dom.bannerProductSelect.addEventListener('change', () => {
+        const val = dom.bannerProductSelect.value;
+        if (val === 'custom') {
+            const newProd = prompt("Enter new custom product name:");
+            if (newProd && newProd.trim()) {
+                const cleanedProd = newProd.trim();
+                if (!state.productList.includes(cleanedProd)) {
+                    state.productList.push(cleanedProd);
+                    saveProductList();
+                }
+                state.productName = cleanedProd;
+                localStorage.setItem('local_product_name', cleanedProd);
+                if (state.firebaseActive && window.database) {
+                    database.ref('productName').set(cleanedProd);
+                }
+                showToast(`Switched active product to: ${cleanedProd}`, "success");
+            } else {
+                dom.bannerProductSelect.value = state.productName || '';
+            }
+        } else if (val) {
+            state.productName = val;
+            localStorage.setItem('local_product_name', val);
+            if (state.firebaseActive && window.database) {
+                database.ref('productName').set(val);
+            }
+            showToast(`Switched active product to: ${val}`, "success");
+        }
+    });
+}
+
+if (dom.btnEditVehicle) {
+    dom.btnEditVehicle.addEventListener('click', () => {
+        const newVehicle = prompt("Enter new Vehicle Number:", state.vehicleNumber || '');
+        if (newVehicle && newVehicle.trim()) {
+            const cleanedVehicle = newVehicle.trim();
+            state.vehicleNumber = cleanedVehicle;
+            localStorage.setItem('local_vehicle_number', cleanedVehicle);
+            if (state.firebaseActive && window.database) {
+                database.ref('vehicleNumber').set(cleanedVehicle);
+            }
+            if (dom.infoVehicleNumber) {
+                dom.infoVehicleNumber.textContent = cleanedVehicle;
+            }
+            showToast(`Vehicle Number updated to: ${cleanedVehicle}`, "success");
+        }
+    });
+}
+
 // Sync Status Badge Indicator
 function updateSyncBadge() {
     const badge = document.getElementById('syncStatus');
@@ -184,6 +484,15 @@ function switchToLocalMode(errorMsg = '') {
     
     // Load local storage data
     loadLocalData();
+    state.vehicleNumber = localStorage.getItem('local_vehicle_number');
+    state.productName = localStorage.getItem('local_product_name');
+    const savedProducts = localStorage.getItem('local_product_list');
+    if (savedProducts) {
+        state.productList = JSON.parse(savedProducts);
+    }
+    renderProductDropdown();
+    renderBannerProductDropdown();
+    checkStartupModal();
 }
 
 function loadLocalData() {
@@ -292,6 +601,17 @@ function restoreState() {
                 document.getElementById(`outTab${savedOutputTab.charAt(0).toUpperCase() + savedOutputTab.slice(1)}`).classList.add('active');
             }
         }
+        
+        // 5. Session Setup Details
+        state.vehicleNumber = localStorage.getItem('local_vehicle_number');
+        state.productName = localStorage.getItem('local_product_name');
+        const savedProducts = localStorage.getItem('local_product_list');
+        if (savedProducts) {
+            state.productList = JSON.parse(savedProducts);
+        }
+        renderProductDropdown();
+        renderBannerProductDropdown();
+        checkStartupModal();
     } catch (e) {
         console.error("Failed to restore states:", e);
     }
@@ -452,7 +772,8 @@ function handleLiveScan(cleanedVal) {
         boxIndex: newBoxIndex,
         startSerial: cleanedVal,
         sequence: newSequence,
-        isDuplicate: isDuplicate
+        isDuplicate: isDuplicate,
+        productName: state.productName
     };
     
     // Write flow: Try Firebase first, fallback to localStorage on fail
@@ -498,8 +819,8 @@ function handleLiveScan(cleanedVal) {
     setTimeout(() => {
         const cards = dom.groupedContainer.querySelectorAll('.box-card');
         if (cards.length > 0) {
-            const lastCard = cards[cards.length - 1];
-            lastCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const firstCard = cards[0];
+            firstCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }, 80);
 }
@@ -666,7 +987,8 @@ function recalculateDuplicates() {
             serial: box.startSerial,
             type: 'start',
             isDuplicate: box.isDuplicate,
-            boxIndex: box.boxIndex
+            boxIndex: box.boxIndex,
+            productName: box.productName || 'Unknown Product'
         });
         
         if (!box.isDuplicate && box.sequence) {
@@ -675,7 +997,8 @@ function recalculateDuplicates() {
                     serial: item.serial,
                     type: 'generated',
                     isDuplicate: item.isDuplicate,
-                    boxIndex: box.boxIndex
+                    boxIndex: box.boxIndex,
+                    productName: box.productName || 'Unknown Product'
                 });
             });
         }
@@ -692,6 +1015,8 @@ function clearLocalState() {
     state.boxes = [];
     state.flatSerials = [];
     state.duplicatesCount = 0;
+    state.vehicleNumber = null;
+    state.productName = null;
     if (state.allowedLengths) {
         state.allowedLengths.clear();
     }
@@ -702,8 +1027,11 @@ function clearLocalState() {
     // Clear localStorage entries
     localStorage.removeItem('local_scanned_serials');
     localStorage.removeItem('local_serial_boxes');
+    localStorage.removeItem('local_vehicle_number');
+    localStorage.removeItem('local_product_name');
     
     renderScannedList();
+    checkStartupModal();
 }
 
 // Clear all inputs and state
@@ -719,7 +1047,12 @@ dom.btnClear.addEventListener('click', () => {
     saveToHistory();
     
     if (state.firebaseActive && window.dbRef) {
-        dbRef.set(null).then(() => {
+        // Clear active session info and boxes
+        Promise.all([
+            dbRef.set(null),
+            database.ref('vehicleNumber').set(null),
+            database.ref('productName').set(null)
+        ]).then(() => {
             clearLocalState();
             showToast("System cleared in database.", "info");
         }).catch(err => {
@@ -879,6 +1212,8 @@ function saveToHistory() {
             id: 'hist_' + now.getTime(),
             timestamp: timestampStr,
             summary: summary,
+            vehicleNumber: state.vehicleNumber || '',
+            productName: state.productName || '',
             boxes: state.boxes || [],
             scannedSerials: state.scannedSerials || [],
             bulkInput: dom.bulkInput ? dom.bulkInput.value : ''
@@ -913,22 +1248,30 @@ function renderHistory() {
             return;
         }
         
-        dom.historyContainer.innerHTML = history.map(item => `
-            <div class="history-card">
-                <div class="history-info">
-                    <span class="history-time">${item.timestamp}</span>
-                    <span class="history-summary">${item.summary}</span>
+        dom.historyContainer.innerHTML = history.map(item => {
+            const vehicleText = item.vehicleNumber ? `<strong>V:</strong> ${item.vehicleNumber}` : '';
+            const productText = item.productName ? `<strong>P:</strong> ${item.productName}` : '';
+            const sessionDetails = [vehicleText, productText].filter(x => x).join(' | ');
+            const detailsHtml = sessionDetails ? `<span class="history-session-details" style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px;">${sessionDetails}</span>` : '';
+            
+            return `
+                <div class="history-card">
+                    <div class="history-info">
+                        <span class="history-time">${item.timestamp}</span>
+                        <span class="history-summary">${item.summary}</span>
+                        ${detailsHtml}
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn-restore-history" onclick="restoreHistory('${item.id}')" title="Restore this data">
+                            Restore
+                        </button>
+                        <button class="btn-delete-history" onclick="deleteHistory('${item.id}')" title="Delete history entry">
+                            <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="history-actions">
-                    <button class="btn-restore-history" onclick="restoreHistory('${item.id}')" title="Restore this data">
-                        Restore
-                    </button>
-                    <button class="btn-delete-history" onclick="deleteHistory('${item.id}')" title="Delete history entry">
-                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-                    </button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
         
         renderIcons();
     } catch (e) {
@@ -949,18 +1292,36 @@ window.restoreHistory = function(id) {
             // Restore active state
             state.boxes = entry.boxes || [];
             state.scannedSerials = entry.scannedSerials || [];
+            state.vehicleNumber = entry.vehicleNumber || null;
+            state.productName = entry.productName || null;
             if (dom.bulkInput) {
                 dom.bulkInput.value = entry.bulkInput || '';
+            }
+            
+            if (state.vehicleNumber) {
+                localStorage.setItem('local_vehicle_number', state.vehicleNumber);
+            } else {
+                localStorage.removeItem('local_vehicle_number');
+            }
+            if (state.productName) {
+                localStorage.setItem('local_product_name', state.productName);
+            } else {
+                localStorage.removeItem('local_product_name');
             }
             
             // Save state locally
             saveLocalData();
             saveScannedSerials();
             renderScannedList();
+            checkStartupModal();
             
             // Sync to Firebase if online
             if (state.firebaseActive && window.dbRef) {
-                dbRef.set(state.boxes).then(() => {
+                Promise.all([
+                    dbRef.set(state.boxes),
+                    database.ref('vehicleNumber').set(state.vehicleNumber),
+                    database.ref('productName').set(state.productName)
+                ]).then(() => {
                     showToast("History data restored and synced to cloud.", "success");
                 }).catch(err => {
                     console.error("Firebase sync failed on restore:", err);
@@ -1078,7 +1439,8 @@ dom.btnGenerate.addEventListener('click', () => {
             boxIndex: index + 1,
             startSerial: start,
             sequence: sequence,
-            isDuplicate: isDuplicate
+            isDuplicate: isDuplicate,
+            productName: state.productName
         });
     });
     
@@ -1129,7 +1491,9 @@ function renderOutput() {
         return;
     }
     
-    dom.groupedContainer.innerHTML = state.boxes.map(box => {
+    dom.groupedContainer.innerHTML = [...state.boxes].reverse().map(box => {
+        const productBadge = box.productName ? `<span class="box-badge text-indigo" style="border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.05);">${box.productName}</span>` : '';
+        
         if (box.isDuplicate) {
             return `
                 <div class="box-card" style="border-color: var(--color-rose); background: rgba(244, 63, 94, 0.03);">
@@ -1140,6 +1504,7 @@ function renderOutput() {
                             <span>Box ${box.boxIndex}</span>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
+                            ${productBadge}
                             <span class="box-badge text-rose" style="border-color: var(--color-rose); background: var(--color-rose-light);">REJECTED: Duplicate Start</span>
                             <button class="btn-delete-box" onclick="event.stopPropagation(); deleteBox(${box.boxIndex})" title="Delete Box">
                                 <i data-lucide="trash-2"></i>
@@ -1166,6 +1531,7 @@ function renderOutput() {
                         <span>Box ${box.boxIndex}</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
+                        ${productBadge}
                         ${dupBadge}
                         <span class="box-badge">Start: ${box.startSerial}</span>
                         <span class="box-badge">${total} Serials</span>
@@ -1202,33 +1568,61 @@ dom.btnCopyFlat.addEventListener('click', () => {
     showToast("All serial numbers copied to clipboard!", "success");
 });
 
-// CSV Export Action
+// Excel Export Action (Multi-Sheet by Product)
 dom.btnDownloadCSV.addEventListener('click', () => {
     if (state.flatSerials.length === 0) {
         showToast("No generated serials to download.", "warning");
         return;
     }
     
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Box,Serial Number,Type,Status\r\n";
+    if (typeof XLSX === 'undefined') {
+        showToast("Excel library is loading or failed to load. Please check internet connection.", "error");
+        return;
+    }
     
+    // Create new workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Group serials by product name
+    const groupedProducts = {};
     state.flatSerials.forEach(item => {
-        const status = item.isDuplicate ? "Duplicate" : "Unique";
-        const row = `Box ${item.boxIndex},${item.serial},${item.type},${status}`;
-        csvContent += row + "\r\n";
+        const prod = item.productName || 'Unknown Product';
+        if (!groupedProducts[prod]) {
+            groupedProducts[prod] = [];
+        }
+        groupedProducts[prod].push(item);
     });
     
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    // Create Excel sheet for each product
+    for (const [prodName, serials] of Object.entries(groupedProducts)) {
+        const sheetData = serials.map(item => ({
+            "Box Number": `Box ${item.boxIndex}`,
+            "Serial Number": item.serial,
+            "Type": item.type === 'start' ? "Starting Serial" : "Generated Sequence",
+            "Status": item.isDuplicate ? "Duplicate" : "Unique"
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(sheetData);
+        
+        // Clean sheet name (SheetJS limit: 31 chars, no special chars)
+        let safeSheetName = prodName.replace(/[\\\/?:*\[\]]/g, '').substring(0, 30);
+        if (!safeSheetName) safeSheetName = "Product";
+        
+        XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+    }
     
+    // Generate filename and trigger download
     const timestamp = new Date().toISOString().slice(0, 10);
-    link.setAttribute("download", `serial_sequences_${timestamp}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const vehicleStr = state.vehicleNumber ? state.vehicleNumber.replace(/[\\\/?:*\[\]]/g, '') : 'session';
+    const filename = `serial_sequences_${vehicleStr}_${timestamp}.xlsx`;
     
-    showToast("CSV file download started.", "success");
+    try {
+        XLSX.writeFile(wb, filename);
+        showToast("Excel file download started.", "success");
+    } catch (e) {
+        console.error("Failed to generate Excel file:", e);
+        showToast("Failed to download Excel file.", "error");
+    }
 });
 
 // Firebase Connection Timeout (Switches to Local mode if connection hangs > 3.5 seconds)
@@ -1266,6 +1660,47 @@ if (window.dbRef) {
         clearTimeout(firebaseTimeout);
         console.warn("Firebase Listener failed (permission rules locked). Switching to local fallback:", error);
         switchToLocalMode(error.message);
+    });
+
+    // Sync vehicleNumber
+    database.ref('vehicleNumber').on('value', (snapshot) => {
+        const val = snapshot.val();
+        state.vehicleNumber = val || null;
+        if (val) {
+            localStorage.setItem('local_vehicle_number', val);
+        } else {
+            localStorage.removeItem('local_vehicle_number');
+        }
+        checkStartupModal();
+    }, (error) => {
+        console.warn("Firebase vehicleNumber listener error:", error);
+    });
+
+    // Sync productName
+    database.ref('productName').on('value', (snapshot) => {
+        const val = snapshot.val();
+        state.productName = val || null;
+        if (val) {
+            localStorage.setItem('local_product_name', val);
+        } else {
+            localStorage.removeItem('local_product_name');
+        }
+        checkStartupModal();
+    }, (error) => {
+        console.warn("Firebase productName listener error:", error);
+    });
+
+    // Sync products
+    database.ref('products').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val && Array.isArray(val)) {
+            state.productList = val;
+        } else {
+            state.productList = ["Smart TV", "LED Panel", "Refrigerator", "Washing Machine", "Air Conditioner", "Solar Battery"];
+        }
+        renderProductDropdown();
+    }, (error) => {
+        console.warn("Firebase products listener error:", error);
     });
 } else {
     clearTimeout(firebaseTimeout);
@@ -1367,8 +1802,34 @@ function registerFileLaunchHandler() {
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=3')
-            .then(reg => console.log('Service Worker registered successfully:', reg.scope))
+        navigator.serviceWorker.register('./sw.js?v=12')
+            .then(reg => {
+                console.log('Service Worker registered successfully:', reg.scope);
+                
+                // Watch for updates
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New worker available and ready, tell it to skipWaiting
+                                console.log('New service worker available, skipping waiting.');
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                            }
+                        });
+                    }
+                });
+            })
             .catch(err => console.warn('Service Worker registration failed:', err));
+    });
+
+    // Reload page once the new service worker has taken control
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            refreshing = true;
+            console.log('Controller changed, reloading page...');
+            window.location.reload();
+        }
     });
 }

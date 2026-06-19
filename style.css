@@ -1388,3 +1388,183 @@ input:checked + .slider:before {
     left: 0;
     z-index: 9999;
 }
+
+/* Session Info Banner */
+.session-info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 24px;
+    box-shadow: var(--shadow-sm);
+    margin-top: -8px; /* Tightly stack under the header */
+    animation: fadeIn var(--transition-fast) ease-out;
+}
+
+.session-info-content {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.session-info-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.session-info-item i, .session-info-item svg {
+    width: 18px;
+    height: 18px;
+    color: var(--accent-indigo);
+}
+
+.session-info-item strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.btn-edit-session {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+}
+
+.btn-edit-session:hover {
+    color: var(--text-primary);
+    border-color: var(--border-color-hover);
+    background: var(--bg-primary);
+}
+
+/* Session Setup Startup Modal */
+.setup-modal {
+    display: none;
+    position: fixed;
+    z-index: 10001;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+}
+
+.setup-modal.active {
+    display: flex;
+}
+
+.setup-modal-content {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 500px;
+    box-shadow: var(--shadow-premium);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: cardSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.setup-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    background: rgba(99, 102, 241, 0.08);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setup-modal-header h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent-indigo);
+    margin: 0;
+}
+
+.setup-modal-header i {
+    width: 24px;
+    height: 24px;
+    color: var(--accent-indigo);
+}
+
+.setup-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.form-input, .form-select {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.form-input:focus, .form-select:focus {
+    border-color: var(--accent-indigo);
+}
+
+.custom-product-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-product-wrapper.active {
+    max-height: 100px;
+}
+
+.setup-modal-footer {
+    padding: 20px 24px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+}
+
+.setup-modal-footer .btn {
+    width: 100%;
+}
+
+.setup-modal-footer .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}

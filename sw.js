@@ -1,11 +1,11 @@
-const CACHE_NAME = 'serial-manager-cache-v4';
+const CACHE_NAME = 'serial-manager-cache-v12';
 const OFFLINE_FALLBACK = 'offline.html';
 
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=4',
-  './app.js?v=4',
+  './style.css?v=12',
+  './app.js?v=12',
   './manifest.json',
   './offline.html'
 ];
@@ -110,4 +110,11 @@ self.addEventListener('notificationclick', (event) => {
       return clients.openWindow('./index.html');
     })
   );
+});
+
+// Message listener for skipWaiting command
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });

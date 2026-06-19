@@ -20,10 +20,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- HTML5 QR/Barcode Scanner library CDN -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- SheetJS Excel Library CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=12">
     <style>
         /* Embedded styles to guarantee modal displays centered and bypasses browser caching */
         .modal-container-root {
@@ -146,7 +148,7 @@
         }
         .mismatch-modal-footer {
             display: flex !important;
-            gap: 16px !important;
+            justify-content: center !important;
             padding: 20px 24px !important;
             background: #1b2436 !important;
             border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -155,19 +157,11 @@
             background: #131a26 !important;
             border: 1px solid #f43f5e !important;
             color: #f43f5e !important;
-            flex: 1 !important;
+            width: 100% !important;
+            max-width: 280px !important;
         }
         .btn-reject:hover {
             background: rgba(244, 63, 94, 0.15) !important;
-        }
-        .btn-approve {
-            background: linear-gradient(135deg, #10b981, #059669) !important;
-            color: #ffffff !important;
-            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3) !important;
-            flex: 1.2 !important;
-        }
-        .btn-approve:hover {
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
         }
     </style>
 </head>
@@ -191,6 +185,34 @@
                 </button>
             </div>
         </header>
+
+        <!-- Session Info Banner -->
+        <section id="sessionInfoBar" class="session-info-bar" style="display: none; margin-bottom: 20px;">
+            <div class="session-info-content" style="width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="session-info-item">
+                        <i data-lucide="truck"></i>
+                        <span>Vehicle: <strong id="infoVehicleNumber">-</strong></span>
+                    </div>
+                    <button id="btnEditVehicle" class="btn btn-icon" style="padding: 4px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer;" title="Change Vehicle Number">
+                        <i data-lucide="edit-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="session-info-item">
+                        <i data-lucide="package"></i>
+                        <span>Active Product:</span>
+                    </div>
+                    <select id="bannerProductSelect" class="form-select" style="padding: 6px 12px; font-size: 0.85rem; height: 34px; width: 180px; min-width: 150px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--radius-sm); outline: none;">
+                        <!-- Dynamic options in banner -->
+                    </select>
+                    <strong id="infoProductStatic" style="display: none; color: var(--text-primary);">None (View Only)</strong>
+                    <button id="btnSetupSession" class="btn btn-primary btn-sm" style="display: none; padding: 4px 8px; font-size: 0.8rem; gap: 4px; align-items: center;" title="Configure Vehicle and Product to start scanning">
+                        <i data-lucide="play-circle" style="width: 14px; height: 14px;"></i> Setup Session
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <!-- Stats Bar -->
         <section class="stats-container">
@@ -359,7 +381,7 @@
                                     <i data-lucide="copy"></i> Copy to Clipboard
                                 </button>
                                 <button id="btnDownloadCSV" class="btn btn-secondary btn-sm">
-                                    <i data-lucide="download"></i> Download CSV
+                                    <i data-lucide="download"></i> Download Excel (.xlsx)
                                 </button>
                             </div>
                         </div>
@@ -400,7 +422,7 @@
                     <h3>Warning: Length Mismatch Detected</h3>
                 </div>
                 <div class="mismatch-modal-body">
-                    <p>The scanned serial number has a different character length than expected. If this is correct, you can approve it; otherwise, reject it to discard the scan.</p>
+                    <p>The scanned serial number has a different character length than expected. Please discard the scan to continue scanning valid serial numbers.</p>
                     <div class="mismatch-details">
                         <div class="mismatch-detail-box">
                             <span class="detail-label">Scanned Serial</span>
@@ -416,14 +438,50 @@
                             <span class="detail-len" id="mismatchExpectedLen">Length: 0</span>
                         </div>
                     </div>
-                    <p class="mismatch-prompt">Do you want to Approve (add this serial) or Reject (discard scan)?</p>
+                    <p class="mismatch-prompt">Please discard this mismatched scan.</p>
                 </div>
                 <div class="mismatch-modal-footer">
                     <button id="btnRejectScan" class="btn btn-secondary btn-lg btn-reject">
                         <i data-lucide="x-circle"></i> Reject (Discard)
                     </button>
-                    <button id="btnApproveScan" class="btn btn-primary btn-lg btn-approve">
-                        <i data-lucide="check-circle"></i> Approve & Add
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Setup Startup Modal -->
+        <div id="sessionSetupModal" class="setup-modal">
+            <div class="setup-modal-content">
+                <div class="setup-modal-header">
+                    <i data-lucide="clipboard-list"></i>
+                    <h3>Session Setup</h3>
+                </div>
+                <div class="setup-modal-body">
+                    <div class="form-group">
+                        <label for="setupVehicleInput">Vehicle Number</label>
+                        <input type="text" id="setupVehicleInput" class="form-input" placeholder="e.g. MH-12-AB-1234" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="setupProductSelect">Product Name</label>
+                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                            <select id="setupProductSelect" class="form-select" style="flex: 1;">
+                                <!-- Dynamic options -->
+                            </select>
+                            <button id="btnDeleteProduct" class="btn btn-icon" style="display: none; flex-shrink: 0; background: rgba(244, 63, 94, 0.1); border: 1px solid var(--color-rose); color: var(--color-rose); height: 46px; width: 46px; border-radius: var(--radius-md); justify-content: center; align-items: center;" title="Delete selected product">
+                                <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="customProductWrapper" class="form-group custom-product-wrapper">
+                        <label for="setupCustomProductInput">Custom Product Name</label>
+                        <input type="text" id="setupCustomProductInput" class="form-input" placeholder="Enter custom product name" autocomplete="off">
+                    </div>
+                </div>
+                <div class="setup-modal-footer" style="display: flex; gap: 12px; width: 100%;">
+                    <button id="btnSkipSetup" class="btn btn-secondary btn-lg" style="flex: 1; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary);">
+                        <i data-lucide="eye"></i> Skip (View Only)
+                    </button>
+                    <button id="btnStartSession" class="btn btn-primary btn-lg" style="flex: 1.5;" disabled>
+                        <i data-lucide="play-circle"></i> Start Scanning
                     </button>
                 </div>
             </div>
@@ -433,6 +491,6 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=12"></script>
 </body>
 </html>
