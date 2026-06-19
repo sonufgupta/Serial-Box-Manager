@@ -1309,11 +1309,16 @@ window.restoreHistory = function(id) {
                 localStorage.removeItem('local_product_name');
             }
             
-            // Save state locally
+                        // Save state locally
             saveLocalData();
             saveScannedSerials();
             renderScannedList();
             checkStartupModal();
+            
+            // Remove the restored entry from history list to prevent duplicates and old states
+            const updatedHistory = history.filter(h => h.id !== id);
+            localStorage.setItem('serial_manager_history', JSON.stringify(updatedHistory));
+            renderHistory();
             
             // Sync to Firebase if online
             if (state.firebaseActive && window.dbRef) {
@@ -1802,7 +1807,7 @@ function registerFileLaunchHandler() {
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=12')
+        navigator.serviceWorker.register('./sw.js?v=13')
             .then(reg => {
                 console.log('Service Worker registered successfully:', reg.scope);
                 
