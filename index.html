@@ -25,7 +25,7 @@
     <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=14">
     <style>
         /* Embedded styles to guarantee modal displays centered and bypasses browser caching */
         .modal-container-root {
@@ -448,6 +448,31 @@
             </div>
         </div>
 
+        <!-- Duplicate Warning Modal -->
+        <div id="duplicateModal" class="mismatch-modal">
+            <div class="mismatch-modal-content">
+                <div class="mismatch-modal-header">
+                    <i data-lucide="alert-octagon" class="warning-icon"></i>
+                    <h3>Warning: Duplicate Serial Detected</h3>
+                </div>
+                <div class="mismatch-modal-body">
+                    <p>The scanned serial number already exists in the system. Duplicates are not allowed and will not be added.</p>
+                    <div class="mismatch-details" style="justify-content: center !important;">
+                        <div class="mismatch-detail-box" style="text-align: center !important; align-items: center !important;">
+                            <span class="detail-label">Duplicate Serial</span>
+                            <span class="detail-val highlight" id="duplicateScannedSerial">-</span>
+                        </div>
+                    </div>
+                    <p class="mismatch-prompt">Please reject/discard this duplicate scan.</p>
+                </div>
+                <div class="mismatch-modal-footer">
+                    <button id="btnRejectDuplicate" class="btn btn-secondary btn-lg btn-reject">
+                        <i data-lucide="x-circle"></i> Reject (Discard)
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Session Setup Startup Modal -->
         <div id="sessionSetupModal" class="setup-modal">
             <div class="setup-modal-content">
@@ -491,6 +516,6 @@
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>

@@ -93,6 +93,11 @@ const dom = {
     btnRejectScan: document.getElementById('btnRejectScan'),
     btnApproveScan: document.getElementById('btnApproveScan'),
     
+    // Duplicate Modal Elements
+    duplicateModal: document.getElementById('duplicateModal'),
+    duplicateScannedSerial: document.getElementById('duplicateScannedSerial'),
+    btnRejectDuplicate: document.getElementById('btnRejectDuplicate'),
+    
     // History Panel Elements
     historyContainer: document.getElementById('historyContainer'),
     
@@ -1100,10 +1105,24 @@ function getExampleForLength(len) {
 
 // Validate scanned serial length and show warning modal if mismatched
 function validateAndProcessScan(cleanedVal) {
-    // 1. Sync allowed lengths from database/local lists
+    // 1. Check for Duplicate Scan
+    const isDuplicate = state.liveMode 
+        ? state.flatSerials.some(s => s.serial === cleanedVal)
+        : state.scannedSerials.includes(cleanedVal);
+        
+    if (isDuplicate) {
+        playWarningBeep();
+        
+        if (dom.duplicateScannedSerial) dom.duplicateScannedSerial.textContent = cleanedVal;
+        if (dom.duplicateModal) dom.duplicateModal.classList.add('active');
+        if (dom.scanInput) dom.scanInput.disabled = true;
+        return; // Halt and do not add duplicate at all
+    }
+
+    // 2. Sync allowed lengths from database/local lists
     updateAllowedLengthsFromState();
     
-    // 2. Perform validation check
+    // 3. Perform validation check
     if (state.allowedLengths.size > 0 && !state.allowedLengths.has(cleanedVal.length)) {
         // Mismatch detected! Play warning beep, show dialog, halt inputs
         playWarningBeep();
@@ -1163,6 +1182,18 @@ if (dom.btnApproveScan) {
             processScan(state.pendingScan);
             state.pendingScan = null;
         }
+    });
+}
+
+// Duplicate modal button handlers
+if (dom.btnRejectDuplicate) {
+    dom.btnRejectDuplicate.addEventListener('click', () => {
+        if (dom.duplicateModal) dom.duplicateModal.classList.remove('active');
+        if (dom.scanInput) {
+            dom.scanInput.disabled = false;
+            dom.scanInput.focus();
+        }
+        showToast("Duplicate scan rejected.", "info");
     });
 }
 
@@ -1807,7 +1838,7 @@ function registerFileLaunchHandler() {
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=13')
+        navigator.serviceWorker.register('./sw.js?v=14')
             .then(reg => {
                 console.log('Service Worker registered successfully:', reg.scope);
                 
